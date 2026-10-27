@@ -19,7 +19,7 @@ def present_slot(slot, equipset, plan):
     if change:return SlotPresentation('fixable','Fix案を確認して、まとめて参照を更新できます。',change)
     issue=next((i for i in plan.issues if i.equipset==equipset and i.slot==slot.name),None)
     if issue and issue.reason=='multiple_candidates':
-        return SlotPresentation('multiple','候補の場所を確認してください。自動では選びません。')
+        return SlotPresentation('multiple','候補の場所を確認してください。')
     if issue and issue.reason=='not_observed':
         return SlotPresentation('missing','アイテムの所在を確認してください。')
     reasons={'incomplete_inventory':'読み取れない収納があります。詳細を確認してください。',

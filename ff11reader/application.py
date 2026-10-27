@@ -84,3 +84,10 @@ def apply_reference_fixes(snapshot, character, plan):
              if Path(s['path']).parent.name==character.folder_id and Path(s['path']).name.lower() in BAGS}
     snapshot.characters[index]=apply_fixes(character,plan,sources)
     return snapshot.characters[index]
+
+
+def inspect_macro_set_links(snapshot, character):
+    from .macro_links import analyze_macro_sets
+    if not any(c is character for c in snapshot.characters):
+        raise ValueError('Unknown character')
+    return analyze_macro_sets(character)
