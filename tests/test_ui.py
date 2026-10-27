@@ -4,6 +4,10 @@ import tkinter as tk
 from tkinter import ttk
 import unittest
 import os
+import tempfile
+import hashlib
+from pathlib import Path
+from ff11reader.edit_application import Editor
 from ff11reader.application import load_snapshot, installations
 from ff11reader.ui import show, ACTION_STYLE
 from ff11reader.presentation import present_slot
@@ -37,8 +41,8 @@ class GraphicalWorkspaceTests(unittest.TestCase):
     self.assertNotIn('disabled',apply.state())
     apply.invoke();app.update()
     self.assertIsNot(view.character,original)
-    self.assertTrue(view.fix_undo[original.folder_id])
-    view.undo_fix();app.update();self.assertIs(view.character,original)
+    self.assertEqual(view.editor.session.cursor,1)
+    view.undo_fix();app.update();self.assertEqual(view.character,original)
 
     app.update()
     cards=list(view.card_widgets.values());geometry=[(w.winfo_x(),w.winfo_y(),w.winfo_width(),w.winfo_height()) for w in cards]
@@ -71,8 +75,11 @@ class GraphicalWorkspaceTests(unittest.TestCase):
       self.assertIn(f'種類ID: {row.item_id}',view.detail.get('1.0','end'))
     self.assertGreater(len([p for p in view.photos.values() if p is not None]),0)
     self.assertEqual(errors,[])
+    for source in snapshot.sources:
+     self.assertEqual(hashlib.sha256(Path(source['path']).read_bytes()).hexdigest(),source['sha256'])
    finally:app.destroy()
-  with patch.object(tk.Tk,'mainloop',run):show(snapshot)
+  root=Path(__file__).resolve().parents[1]/'work'/'ui-tests';root.mkdir(parents=True,exist_ok=True)
+  with tempfile.TemporaryDirectory(dir=root) as tmp, patch('ff11reader.ui.Editor',side_effect=lambda snap:Editor(snap,Path(tmp)/'draft.json')), patch.object(tk.Tk,'mainloop',run):show(snapshot)
 
 
 if __name__=='__main__':unittest.main()
