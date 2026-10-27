@@ -1,0 +1,610 @@
+[
+  {
+    "id": "S01",
+    "type": "official",
+    "title": "2022年2月10日 マクロ40ブックと装備セット200への拡張",
+    "url": "https://we-are-vanadiel.finalfantasyxi.com/history/?year=2022",
+    "supports": [
+      "40 books",
+      "200 equipment sets"
+    ],
+    "accessed": "2026-10-27"
+  },
+  {
+    "id": "S02",
+    "repo": "alicestellar/MacroEditor",
+    "sha": "d5b33ec89da8518b520dbab4a052ba73b24b713c",
+    "path": "Macro Editor/MacroFileManager.cs",
+    "supports": [
+      "macro offsets",
+      "MD5 body",
+      "book titles"
+    ],
+    "caution": "Encoding.Default and string-based truncation are not adopted.",
+    "type": "public implementation",
+    "accessed": "2026-10-27",
+    "urls": [
+      "https://github.com/alicestellar/MacroEditor/blob/d5b33ec89da8518b520dbab4a052ba73b24b713c/Macro%20Editor/MacroFileManager.cs"
+    ]
+  },
+  {
+    "id": "S03",
+    "repo": "Windower/ResourceExtractor",
+    "sha": "501efba4a0e8d5d621c293a7628f4eb4f31227d3",
+    "paths": [
+      "Program.cs",
+      "ResourceParser.cs",
+      "ExtensionMethods.cs"
+    ],
+    "supports": [
+      "registry lookup",
+      "FTABLE lookup",
+      "Japanese item DAT IDs",
+      "rotate-right 5",
+      "equipment slot mask"
+    ],
+    "type": "public implementation",
+    "accessed": "2026-10-27",
+    "urls": [
+      "https://github.com/Windower/ResourceExtractor/blob/501efba4a0e8d5d621c293a7628f4eb4f31227d3/Program.cs",
+      "https://github.com/Windower/ResourceExtractor/blob/501efba4a0e8d5d621c293a7628f4eb4f31227d3/ResourceParser.cs",
+      "https://github.com/Windower/ResourceExtractor/blob/501efba4a0e8d5d621c293a7628f4eb4f31227d3/ExtensionMethods.cs"
+    ]
+  },
+  {
+    "id": "S04",
+    "repo": "Soverance/Vanalytics",
+    "sha": "ad0ae9c59df22edd015a10e268abe4b3f9490892",
+    "path": "addon/vanalytics/macros.lua",
+    "supports": [
+      "macro record structure",
+      "Ctrl then Alt"
+    ],
+    "caution": "20-book constant, ASCII-only decoder and optional MD5 handling are not adopted.",
+    "type": "public implementation",
+    "accessed": "2026-10-27",
+    "urls": [
+      "https://github.com/Soverance/Vanalytics/blob/ad0ae9c59df22edd015a10e268abe4b3f9490892/addon/vanalytics/macros.lua"
+    ]
+  },
+  {
+    "id": "S05",
+    "repo": "jimmy58663/GordianXI",
+    "sha": "002ec64ab136ff708f138abf9c6a2626507c9f5f",
+    "paths": [
+      "src/Gordian.Engine/Ui/RetailEquipSets.cs",
+      "docs/ui/retail-user-files.md"
+    ],
+    "supports": [
+      "equipset record layout",
+      "slot order",
+      "slot bitfields"
+    ],
+    "caution": "Public implementation reports limited local evidence. Our local check validates all referenced IDs and equip slots, but not game write acceptance.",
+    "type": "public implementation",
+    "accessed": "2026-10-27",
+    "urls": [
+      "https://github.com/jimmy58663/GordianXI/blob/002ec64ab136ff708f138abf9c6a2626507c9f5f/src/Gordian.Engine/Ui/RetailEquipSets.cs",
+      "https://github.com/jimmy58663/GordianXI/blob/002ec64ab136ff708f138abf9c6a2626507c9f5f/docs/ui/retail-user-files.md"
+    ]
+  },
+  {
+    "id": "S06",
+    "repo": "jimmy58663/GordianXI",
+    "sha": "002ec64ab136ff708f138abf9c6a2626507c9f5f",
+    "path": "docs/ui/macros.md",
+    "supports": [
+      "macro layout",
+      "mcr.sys current selection",
+      "unknown header fields",
+      "trailing bytes"
+    ],
+    "type": "public implementation",
+    "accessed": "2026-10-27",
+    "urls": [
+      "https://github.com/jimmy58663/GordianXI/blob/002ec64ab136ff708f138abf9c6a2626507c9f5f/docs/ui/macros.md"
+    ]
+  },
+  {
+    "id": "S07",
+    "repo": "alicestellar/MacroEditor",
+    "sha": "d5b33ec89da8518b520dbab4a052ba73b24b713c",
+    "path": "Macro Editor/AutoTranslateEncoder.cs",
+    "supports": [
+      "FD + four bytes + FD auto-translate token"
+    ],
+    "type": "public implementation",
+    "accessed": "2026-10-27",
+    "urls": [
+      "https://github.com/alicestellar/MacroEditor/blob/d5b33ec89da8518b520dbab4a052ba73b24b713c/Macro%20Editor/AutoTranslateEncoder.cs"
+    ]
+  },
+  {
+    "id": "S08",
+    "repo": "atom0s/XiPackets",
+    "sha": "ebe2216a991ff88254ad600cc5bae8e3d9e80306",
+    "paths": [
+      "world/client/0x0052/README.md",
+      "world/server/0x0116/README.md"
+    ],
+    "supports": [
+      "equipsetrequestitem_t bitfields",
+      "keep and remove states"
+    ],
+    "caution": "Packet structure is not by itself a DAT-file specification.",
+    "type": "public implementation",
+    "accessed": "2026-10-27",
+    "urls": [
+      "https://github.com/atom0s/XiPackets/blob/ebe2216a991ff88254ad600cc5bae8e3d9e80306/world/client/0x0052/README.md",
+      "https://github.com/atom0s/XiPackets/blob/ebe2216a991ff88254ad600cc5bae8e3d9e80306/world/server/0x0116/README.md"
+    ]
+  },
+  {
+    "id": "S09",
+    "repo": "Soverance/Vanalytics",
+    "sha": "ad0ae9c59df22edd015a10e268abe4b3f9490892",
+    "path": "addon/vanalytics/inventory.lua",
+    "supports": [
+      "container ID map",
+      "live snapshot fields"
+    ],
+    "caution": "Reads live Windower API, not USER inventory DAT files. Not installed or executed.",
+    "type": "public implementation",
+    "accessed": "2026-10-27",
+    "urls": [
+      "https://github.com/Soverance/Vanalytics/blob/ad0ae9c59df22edd015a10e268abe4b3f9490892/addon/vanalytics/inventory.lua"
+    ]
+  },
+  {
+    "id": "S10",
+    "type": "firsthand experiment report",
+    "title": "Cerberus.Gillesjboulon inventory sorting experiment, 2023-02-28 and 2023-03-02",
+    "url": "https://www.ffxiah.com/forum/topic/57173/macrosgearmaps-inquiry",
+    "supports": [
+      "storage filename candidates",
+      "is.dat contains ordering-related state"
+    ],
+    "caution": "Does not prove cache completeness or freshness.",
+    "accessed": "2026-10-27"
+  },
+  {
+    "id": "S11",
+    "type": "public implementation or author documentation",
+    "repo": "Windower/POLUtils",
+    "sha": "b2e8b10933544e1e0cd37afd4e0bb3f34649f898",
+    "paths": [
+      "PlayOnline.FFXI/FFXIEncoding.cs",
+      "PlayOnline.FFXI.Utils.MacroManager/MacroSet.cs",
+      "PlayOnline.FFXI.Utils.MacroManager/Macro.cs",
+      "LICENSE.txt"
+    ],
+    "supports": [
+      "FFXI custom encoding and macro reader/writer"
+    ],
+    "caution": "Source reviewed; modern Japanese round-trip not tested locally.",
+    "license_observation": "Apache-2.0 (LICENSE.txt inspected)",
+    "accessed": "2026-10-27",
+    "inspection_level": "selected source or documentation read",
+    "urls": [
+      "https://github.com/Windower/POLUtils/blob/b2e8b10933544e1e0cd37afd4e0bb3f34649f898/PlayOnline.FFXI/FFXIEncoding.cs",
+      "https://github.com/Windower/POLUtils/blob/b2e8b10933544e1e0cd37afd4e0bb3f34649f898/PlayOnline.FFXI.Utils.MacroManager/MacroSet.cs",
+      "https://github.com/Windower/POLUtils/blob/b2e8b10933544e1e0cd37afd4e0bb3f34649f898/PlayOnline.FFXI.Utils.MacroManager/Macro.cs",
+      "https://github.com/Windower/POLUtils/blob/b2e8b10933544e1e0cd37afd4e0bb3f34649f898/LICENSE.txt"
+    ]
+  },
+  {
+    "id": "S12",
+    "type": "public implementation or author documentation",
+    "repo": "TeoTwawki/LootBox",
+    "sha": "56f3a7e0181766431b5fb4c685c40339a94cb984",
+    "paths": [
+      "LootBox/FFXIHelper.h",
+      "LootBox/FFXIHelper.cpp",
+      "ReadMe.md",
+      "LICENSE.txt"
+    ],
+    "supports": [
+      "Offline inventory ID parser; offset 0x2B0, span 0x288, skip 8, stride 8"
+    ],
+    "caution": "Old 0xC00 master-item size and ID limits must not be adopted for current local data.",
+    "license_observation": "MIT (LICENSE.txt inspected)",
+    "accessed": "2026-10-27",
+    "inspection_level": "selected source or documentation read",
+    "urls": [
+      "https://github.com/TeoTwawki/LootBox/blob/56f3a7e0181766431b5fb4c685c40339a94cb984/LootBox/FFXIHelper.h",
+      "https://github.com/TeoTwawki/LootBox/blob/56f3a7e0181766431b5fb4c685c40339a94cb984/LootBox/FFXIHelper.cpp",
+      "https://github.com/TeoTwawki/LootBox/blob/56f3a7e0181766431b5fb4c685c40339a94cb984/ReadMe.md",
+      "https://github.com/TeoTwawki/LootBox/blob/56f3a7e0181766431b5fb4c685c40339a94cb984/LICENSE.txt"
+    ]
+  },
+  {
+    "id": "S13",
+    "type": "public implementation or author documentation",
+    "repo": "Mandracord/VanaCargo",
+    "sha": "e641972d993031f859cacf0a15facae2f1462404",
+    "paths": [
+      "VanaCargoCore/FFXIHelper.h",
+      "VanaCargoCore/FFXIHelper.cpp",
+      "VanaCargoCore/CoreApi.cpp",
+      "VanaCargoApp/MainWindow.xaml.cs",
+      "ReadMe.md",
+      "LICENSE",
+      "LICENSE.txt"
+    ],
+    "supports": [
+      "LootBox-derived offline inventory core and WPF UI"
+    ],
+    "caution": "Reviewed core uses same inventory constants as LootBox. Completeness, quantity and extdata not established.",
+    "license_observation": "MIT (both license files inspected)",
+    "accessed": "2026-10-27",
+    "inspection_level": "selected source or documentation read",
+    "urls": [
+      "https://github.com/Mandracord/VanaCargo/blob/e641972d993031f859cacf0a15facae2f1462404/VanaCargoCore/FFXIHelper.h",
+      "https://github.com/Mandracord/VanaCargo/blob/e641972d993031f859cacf0a15facae2f1462404/VanaCargoCore/FFXIHelper.cpp",
+      "https://github.com/Mandracord/VanaCargo/blob/e641972d993031f859cacf0a15facae2f1462404/VanaCargoCore/CoreApi.cpp",
+      "https://github.com/Mandracord/VanaCargo/blob/e641972d993031f859cacf0a15facae2f1462404/VanaCargoApp/MainWindow.xaml.cs",
+      "https://github.com/Mandracord/VanaCargo/blob/e641972d993031f859cacf0a15facae2f1462404/ReadMe.md",
+      "https://github.com/Mandracord/VanaCargo/blob/e641972d993031f859cacf0a15facae2f1462404/LICENSE",
+      "https://github.com/Mandracord/VanaCargo/blob/e641972d993031f859cacf0a15facae2f1462404/LICENSE.txt"
+    ]
+  },
+  {
+    "id": "S14",
+    "type": "public implementation or author documentation",
+    "repo": "ejouanchicot/ffxi-macro-editor",
+    "sha": "0b898361ed587564ff4b92992b8a955ff1dbc1f5",
+    "paths": [
+      "README.md",
+      "docs/FORMAT.md",
+      "src/FfxiMacros.Core/Io/MacroBookFile.cs",
+      "src/FfxiMacros.Core/Text/FfxiText.cs",
+      "src/FfxiMacros.Core/GameData/GameAutoTranslateLoader.cs",
+      "tests/FfxiMacros.Tests/CorpusRoundTripTests.cs",
+      "LICENSE"
+    ],
+    "supports": [
+      "Lossless byte escaping, field model, local game dictionary, corpus tests"
+    ],
+    "caution": "ASCII-centered ordinary text; not a complete Japanese text editor. Corpus tests return early without corpus. Tests not run here.",
+    "license_observation": "MIT (LICENSE inspected)",
+    "accessed": "2026-10-27",
+    "inspection_level": "selected source or documentation read",
+    "urls": [
+      "https://github.com/ejouanchicot/ffxi-macro-editor/blob/0b898361ed587564ff4b92992b8a955ff1dbc1f5/README.md",
+      "https://github.com/ejouanchicot/ffxi-macro-editor/blob/0b898361ed587564ff4b92992b8a955ff1dbc1f5/docs/FORMAT.md",
+      "https://github.com/ejouanchicot/ffxi-macro-editor/blob/0b898361ed587564ff4b92992b8a955ff1dbc1f5/src/FfxiMacros.Core/Io/MacroBookFile.cs",
+      "https://github.com/ejouanchicot/ffxi-macro-editor/blob/0b898361ed587564ff4b92992b8a955ff1dbc1f5/src/FfxiMacros.Core/Text/FfxiText.cs",
+      "https://github.com/ejouanchicot/ffxi-macro-editor/blob/0b898361ed587564ff4b92992b8a955ff1dbc1f5/src/FfxiMacros.Core/GameData/GameAutoTranslateLoader.cs",
+      "https://github.com/ejouanchicot/ffxi-macro-editor/blob/0b898361ed587564ff4b92992b8a955ff1dbc1f5/tests/FfxiMacros.Tests/CorpusRoundTripTests.cs",
+      "https://github.com/ejouanchicot/ffxi-macro-editor/blob/0b898361ed587564ff4b92992b8a955ff1dbc1f5/LICENSE"
+    ]
+  },
+  {
+    "id": "S15",
+    "type": "public implementation or author documentation",
+    "repo": "hikaruoshino/FF11-MacroEditor",
+    "sha": "f351578a24d17c24c0a3c8e81c9f450d5fc1b210",
+    "paths": [
+      "README.md"
+    ],
+    "supports": [
+      "Japanese macro editor feature comparison; A-D slot export and cross-character copy"
+    ],
+    "caution": "Author explicitly states source is not published. Documentation only; executable not downloaded or run.",
+    "license_observation": "No open-source license asserted; author terms apply",
+    "accessed": "2026-10-27",
+    "inspection_level": "selected source or documentation read",
+    "urls": [
+      "https://github.com/hikaruoshino/FF11-MacroEditor/blob/f351578a24d17c24c0a3c8e81c9f450d5fc1b210/README.md"
+    ]
+  },
+  {
+    "id": "S16",
+    "type": "public implementation or author documentation",
+    "repo": "haeal/ffxi-macro-editor",
+    "sha": "5294af016a5565d656b379649aa032970295a12d",
+    "paths": [
+      "README.md",
+      "src/lib/ffxiMacroFormat.js"
+    ],
+    "supports": [
+      "Raw original fields reused when display values unchanged"
+    ],
+    "caution": "View sanitization is separate from original-byte retention; Japanese codec unvalidated.",
+    "license_observation": "Not assessed",
+    "accessed": "2026-10-27",
+    "inspection_level": "selected source or documentation read",
+    "urls": [
+      "https://github.com/haeal/ffxi-macro-editor/blob/5294af016a5565d656b379649aa032970295a12d/README.md",
+      "https://github.com/haeal/ffxi-macro-editor/blob/5294af016a5565d656b379649aa032970295a12d/src/lib/ffxiMacroFormat.js"
+    ]
+  },
+  {
+    "id": "S17",
+    "type": "public implementation or author documentation",
+    "repo": "mullerdane85-hash/FFXIMacroManager",
+    "sha": "daa4ae5e5e8174d060715e4ab985e886d83ddb5e",
+    "paths": [
+      "README.md"
+    ],
+    "supports": [
+      "Author reports live-edit conflicts, backups, temporary-save workflow"
+    ],
+    "caution": "README only for this project; ASCII and 20-book assumptions present. Reported round-trip not independently run.",
+    "license_observation": "Not assessed",
+    "accessed": "2026-10-27",
+    "inspection_level": "selected source or documentation read",
+    "urls": [
+      "https://github.com/mullerdane85-hash/FFXIMacroManager/blob/daa4ae5e5e8174d060715e4ab985e886d83ddb5e/README.md"
+    ]
+  },
+  {
+    "id": "S18",
+    "type": "public implementation or author documentation",
+    "repo": "Windower/Lua",
+    "sha": "719072a9c3a69140dd6f57ecab5a5a126110c40e",
+    "paths": [
+      "addons/findAll/README.md"
+    ],
+    "supports": [
+      "Snapshot update triggers, inventory loading warning"
+    ],
+    "caution": "Addon cache, not a parser for USER DAT files.",
+    "license_observation": "Not assessed for adoption",
+    "accessed": "2026-10-27",
+    "inspection_level": "selected source or documentation read",
+    "urls": [
+      "https://github.com/Windower/Lua/blob/719072a9c3a69140dd6f57ecab5a5a126110c40e/addons/findAll/README.md"
+    ]
+  },
+  {
+    "id": "S19",
+    "type": "public implementation or author documentation",
+    "repo": "ThornyFFXI/FindAll",
+    "sha": "2c98237db2a3a86918e86b4cc0380cdd2f60c849",
+    "paths": [
+      "README.md"
+    ],
+    "supports": [
+      "Ashita cache waits for complete inventory load; disk cache control"
+    ],
+    "caution": "Distinct from Windower FindAll; no plugin installed.",
+    "license_observation": "Not assessed for adoption",
+    "accessed": "2026-10-27",
+    "inspection_level": "selected source or documentation read",
+    "urls": [
+      "https://github.com/ThornyFFXI/FindAll/blob/2c98237db2a3a86918e86b4cc0380cdd2f60c849/README.md"
+    ]
+  },
+  {
+    "id": "S20",
+    "type": "public implementation or author documentation",
+    "repo": "andyking999/ffxi-macro-editor-python",
+    "sha": "f001c920e2b2b916f3005f31395d8741f734f080",
+    "paths": [
+      "README.md"
+    ],
+    "supports": [
+      "Python macro editor discovery"
+    ],
+    "caution": "README has book-count and path inconsistencies; not accepted as format authority.",
+    "license_observation": "README claims MIT; license file not independently verified",
+    "accessed": "2026-10-27",
+    "inspection_level": "selected source or documentation read",
+    "urls": [
+      "https://github.com/andyking999/ffxi-macro-editor-python/blob/f001c920e2b2b916f3005f31395d8741f734f080/README.md"
+    ]
+  },
+  {
+    "id": "S21",
+    "type": "repository tree discovery",
+    "repo": "steaksauce-/ffximev2-continued",
+    "sha": "976d2a883c1aab6f51bad684c92254711288bc17",
+    "paths": [],
+    "supports": [
+      "Source-tree discovery: Yekyaa.FFXIEncoding source and conversion binary files"
+    ],
+    "caution": "Tree inspected only. Codec and license content not evaluated.",
+    "license_observation": "LICENSE file observed; contents not reviewed",
+    "accessed": "2026-10-27",
+    "inspection_level": "tree only",
+    "urls": [
+      "https://github.com/steaksauce-/ffximev2-continued/tree/976d2a883c1aab6f51bad684c92254711288bc17"
+    ]
+  },
+  {
+    "id": "S22",
+    "type": "public implementation or protocol research",
+    "repo": "Windower/Lua",
+    "sha": "719072a9c3a69140dd6f57ecab5a5a126110c40e",
+    "paths": [
+      "addons/libs/extdata.lua"
+    ],
+    "supports": [
+      "Decoder requires item ID and 24 individual extdata bytes"
+    ],
+    "caution": "Decoder not run locally; acquisition from USER unresolved",
+    "accessed": "2026-10-27",
+    "urls": [
+      "https://github.com/Windower/Lua/blob/719072a9c3a69140dd6f57ecab5a5a126110c40e/addons/libs/extdata.lua"
+    ]
+  },
+  {
+    "id": "S23",
+    "type": "public implementation or protocol research",
+    "repo": "atom0s/XiPackets",
+    "sha": "ebe2216a991ff88254ad600cc5bae8e3d9e80306",
+    "paths": [
+      "world/server/0x0020/README.md"
+    ],
+    "supports": [
+      "Packet includes quantity, ID, container, index and Attr[24]"
+    ],
+    "caution": "Network format, not a USER-file specification; no capture performed",
+    "accessed": "2026-10-27",
+    "urls": [
+      "https://github.com/atom0s/XiPackets/blob/ebe2216a991ff88254ad600cc5bae8e3d9e80306/world/server/0x0020/README.md"
+    ]
+  },
+  {
+    "id": "S24",
+    "type": "public implementation or protocol research",
+    "repo": "Windower/Lua",
+    "sha": "719072a9c3a69140dd6f57ecab5a5a126110c40e",
+    "paths": [
+      "addons/findAll/findAll.lua"
+    ],
+    "supports": [
+      "get_local_storage aggregates counts by item ID per bag"
+    ],
+    "caution": "This export drops individual position and extdata; other FindAll implementations may differ",
+    "accessed": "2026-10-27",
+    "urls": [
+      "https://github.com/Windower/Lua/blob/719072a9c3a69140dd6f57ecab5a5a126110c40e/addons/findAll/findAll.lua"
+    ]
+  },
+  {
+    "id": "S25",
+    "type": "public implementation",
+    "repo": "ThornyFFXI/FindAll",
+    "sha": "2c98237db2a3a86918e86b4cc0380cdd2f60c849",
+    "paths": [
+      "InventoryCache.h",
+      "InventoryCache.cpp"
+    ],
+    "supports": [
+      "incoming ExtData copied into item.Extra; binary item_t arrays persisted by TryWriteFile"
+    ],
+    "caution": "Ashita ABI/version and complete-loading behavior must be checked; instant-load path can write client memory, so do not adopt entire plugin as a read-only collector.",
+    "accessed": "2026-10-27",
+    "urls": [
+      "https://github.com/ThornyFFXI/FindAll/blob/2c98237db2a3a86918e86b4cc0380cdd2f60c849/InventoryCache.h",
+      "https://github.com/ThornyFFXI/FindAll/blob/2c98237db2a3a86918e86b4cc0380cdd2f60c849/InventoryCache.cpp"
+    ]
+  },
+  {
+    "id": "S26",
+    "type": "public implementation",
+    "repo": "Windower/Lua",
+    "sha": "719072a9c3a69140dd6f57ecab5a5a126110c40e",
+    "paths": [
+      "addons/GearSwap/export.lua"
+    ],
+    "supports": [
+      "get_item_list decodes augments into export records"
+    ],
+    "caution": "Reviewed export does not preserve exact original bag/index/raw extdata; not sufficient as the individual-instance interchange format.",
+    "accessed": "2026-10-27",
+    "urls": [
+      "https://github.com/Windower/Lua/blob/719072a9c3a69140dd6f57ecab5a5a126110c40e/addons/GearSwap/export.lua"
+    ]
+  },
+  {
+    "id": "S27",
+    "type": "firsthand developer explanation",
+    "title": "Augment details for Gear; Thorny and Niflheim, 2026-06-11",
+    "url": "https://www.ffxiah.com/forum/topic/58991/augment-details-for-gear/1/",
+    "supports": [
+      "rank/path augment expansion can require DAT lookup",
+      "Windower get_item_augments return-data description"
+    ],
+    "caution": "Native function arguments and runtime behavior on this PC not verified.",
+    "accessed": "2026-10-27"
+  },
+  {
+    "id": "S28",
+    "type": "official developer discussion",
+    "title": "Lomloon: equipset internal location and fallback search, 2014-08-06",
+    "url": "https://forum.square-enix.com/ffxi/threads/42924-装備一括変更機能について語るスレ?p=519207&viewfull=1",
+    "supports": [
+      "internal location survives sort",
+      "cross-storage move loses instance selection",
+      "same-name fallback search"
+    ],
+    "caution": "Search-indexed post content confirmed; direct page fetch failed. Historical 2014 storage configuration.",
+    "accessed": "2026-10-27"
+  },
+  {
+    "id": "S29",
+    "type": "official",
+    "title": "2014-08-12 equipment set stored information",
+    "urls": [
+      "https://forum.square-enix.com/ffxi/threads/43705-2014.08.12-バージョンアップ情報?p=519773&viewfull=1",
+      "https://forum.square-enix.com/ffxi/threads/43706-Aug-12-2014-%28JST%29-Version-Update"
+    ],
+    "supports": [
+      "same-name item distinction",
+      "sort persistence",
+      "storage move and fallback"
+    ],
+    "caution": "Historical; no claim about exact modern wardrobe 2-8 priority.",
+    "accessed": "2026-10-27"
+  },
+  {
+    "id": "S30",
+    "type": "protocol reverse engineering",
+    "repo": "atom0s/XiPackets",
+    "sha": "ebe2216a991ff88254ad600cc5bae8e3d9e80306",
+    "urls": [
+      "https://github.com/atom0s/XiPackets/blob/ebe2216a991ff88254ad600cc5bae8e3d9e80306/world/client/0x0051/README.md"
+    ],
+    "supports": [
+      "execution packet carries container/index/equipment slot, no item type ID"
+    ],
+    "caution": "Does not prove all retail client resolver behavior.",
+    "accessed": "2026-10-27"
+  },
+  {
+    "id": "S31",
+    "type": "public implementation",
+    "repo": "jimmy58663/GordianXI",
+    "sha": "b054bec8465263f2eb78b8b712fd7663bf88bdb0",
+    "urls": [
+      "https://github.com/jimmy58663/GordianXI/blob/b054bec8465263f2eb78b8b712fd7663bf88bdb0/src/Gordian.Engine/Actions/PlayerActionService.EquipmentSets.cs"
+    ],
+    "supports": [
+      "LocatePiece checks stored position then searches equippable containers by type ID",
+      "taken positions avoid selecting same copy twice"
+    ],
+    "caution": "Independent client, not proof of retail priority or augment matching.",
+    "accessed": "2026-10-27"
+  },
+  {
+    "id": "S32",
+    "type": "public implementation",
+    "repo": "LandSandBoat/server",
+    "sha": "3106301c961a0cd968a5a456026d4f75f1b289c6",
+    "urls": [
+      "https://github.com/LandSandBoat/server/blob/3106301c961a0cd968a5a456026d4f75f1b289c6/src/map/packets/c2s/0x051_equipset_set.cpp"
+    ],
+    "supports": [
+      "server implementation consumes final index/container/equipment slot"
+    ],
+    "caution": "Private-server implementation, not retail server source.",
+    "accessed": "2026-10-27"
+  },
+  {
+    "id": "S33",
+    "type": "developer experiment",
+    "title": "よしざうるす: かばん, 2021-10-28",
+    "url": "https://yyoshisaur.hatenablog.com/entry/2021/10/28/200000",
+    "supports": [
+      "internal inventory slot differs from displayed order",
+      "sort/manual reorder reportedly leave slot unchanged"
+    ],
+    "caution": "Author experiment; not a current runtime trace on this PC.",
+    "accessed": "2026-10-27"
+  },
+  {
+    "id": "S34",
+    "type": "firsthand discussion",
+    "title": "FFXIAH Inventory Management Guide: duplicate mantles, February 2022",
+    "url": "https://www.ffxiah.com/forum/topic/56521/ffxi-inventory-management-guide/",
+    "supports": [
+      "duplicate selection works within same wardrobe",
+      "wrong same-name item after storage movement reported"
+    ],
+    "caution": "Includes conflicting participant assumptions; line-position theory is not adopted as established fact.",
+    "accessed": "2026-10-27"
+  }
+]

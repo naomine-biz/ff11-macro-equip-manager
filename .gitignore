@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+work/
+backups/
+evidence/
+snapshot*.json
+verification*.json
+character-labels.json
+character-labels.tmp
+*.dat
+*.DAT
+*.log
+.env
+.env.*
+.DS_Store
