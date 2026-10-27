@@ -99,6 +99,7 @@ class ReaderWindow:
   self.undo_button=ttk.Button(history,text='Undo',command=self.undo_fix);self.undo_button.pack(side='left',expand=True,fill='x')
   self.redo_button=ttk.Button(history,text='Redo',command=self.redo_edit);self.redo_button.pack(side='left',expand=True,fill='x')
   self.draft_label=ttk.Label(right,text='');self.draft_label.pack(fill='x')
+  ttk.Button(right,text='収納番号Fixをゲームに保存…',command=self.preview_game_save).pack(fill='x',pady=(0,6))
   ttk.Button(right,text='作業ファイルを保管して編集をリセット',command=self.reset_edits).pack(fill='x',pady=(0,6))
   ttk.Label(right,text='Item / Help',font=('MS Gothic',14,'bold')).pack(anchor='w',pady=(0,12))
   self.detail=tk.Text(right,width=38,wrap='word',font=('MS Gothic',10),bg='#101b38',fg='#edf1fa',insertbackground='white',selectbackground='#354b7a',relief='sunken',borderwidth=1,padx=12,pady=12,state='disabled')
@@ -172,7 +173,7 @@ class ReaderWindow:
   session=self.editor.session
   self.undo_button.configure(state='normal' if session.cursor and not self.editor.blocked else 'disabled')
   self.redo_button.configure(state='normal' if session.cursor<len(session.history) and not self.editor.blocked else 'disabled')
-  self.draft_label.configure(text='作業再開の確認が必要' if self.editor.blocked else f'編集中 {session.cursor}操作 · '+('変更あり' if session.dirty else '読込時の状態'))
+  self.draft_label.configure(text='作業再開の確認が必要' if self.editor.blocked else f'編集中 {session.cursor}操作 · '+('変更あり' if session.dirty else '保存済み状態'))
  def refresh_edits(self):
   selected=self.selected;address=self.active_macro
   self.snapshot=self.editor.session.working
@@ -196,12 +197,31 @@ class ReaderWindow:
  def reset_edits(self):
   if not messagebox.askyesno('編集をリセット','現在の作業ファイルを保管し、読込時の状態から編集を開始しますか？',parent=self.app):return
   try:self.editor.start_fresh()
-  except OSError as e:messagebox.showerror('リセット',str(e),parent=self.app);return
+  except (OSError,ValueError) as e:messagebox.showerror('リセット',str(e),parent=self.app);return
   self.refresh_edits()
  def preview_game_save(self):
-  messagebox.showinfo('編集バッファ','現在はアプリ内の編集と作業保存を利用できます。',parent=self.app)
- def restore_game_save(self):
-  self.preview_game_save()
+  if not self.character:return
+  try:plan=self.editor.prepare_macro_save(self.character.folder_id)
+  except (OSError,ValueError,RuntimeError) as e:messagebox.showerror('保存プレビュー',str(e),parent=self.app);return
+  window=tk.Toplevel(self.app,background='#080f22');window.title('マクロ収納番号Fix / ゲームへの保存');window.geometry('980x680')
+  count=sum(len(f.changes) for f in plan.files)
+  ttk.Label(window,text=f'{self.character.display_name or self.character.folder_id} · {count}行 / {len(plan.files)}ファイル · その他のマクロ編集 {plan.deferred}件は作業データに保持',padding=10).pack(anchor='w')
+  ttk.Label(window,text='保存が完了するまでFF11・PlayOnlineを終了した状態にしてください。全対象をバックアップ後に保存します。',padding=10).pack(anchor='w')
+  text=tk.Text(window,bg='#101b38',fg='#edf1fa',wrap='word',padx=12,pady=12)
+  bar=ttk.Scrollbar(window,command=text.yview);text.configure(yscrollcommand=bar.set);bar.pack(side='right',fill='y');text.pack(fill='both',expand=True)
+  for file in plan.files:
+   text.insert('end',file.target+'\n')
+   for change in file.changes:
+    b,p,bank,key=change.address
+    text.insert('end',f'ブック {b:02} / パレット {p} / {bank.upper()} {key if key<10 else 0} / {change.line}行目\n  前: {change.before}\n  後: {change.after}\n\n')
+  text.configure(state='disabled')
+  def save():
+   button.configure(state='disabled');window.update_idletasks()
+   try:backup=self.editor.save_macros(plan,Path(__file__).resolve().parent.parent/'backups'/'macros')
+   except (OSError,ValueError,RuntimeError) as e:
+    self.update_edit_status();messagebox.showerror('ゲームへの保存',str(e),parent=window);button.configure(state='normal');return
+   window.destroy();self.refresh_edits();self.footer.configure(text=f'{count}行を保存・検証しました。バックアップ: {backup}')
+  button=ttk.Button(window,text=f'バックアップして{count}行をゲームに保存',command=save);button.pack(pady=12)
  def change_character(self,event=None):self.change_mode()
  def change_mode(self):
   if not self.character:return

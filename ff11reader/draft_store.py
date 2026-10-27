@@ -1,5 +1,6 @@
 """Application draft persistence; all writes stay in the application work directory."""
 from dataclasses import fields, is_dataclass
+from copy import deepcopy
 import hashlib
 import json
 import os
@@ -51,9 +52,23 @@ class DraftStore:
         if not self.path.exists():
             return session
         data = json.loads(self.path.read_text(encoding='utf-8'))
-        if data['version'] != 1 or data['installation'] != snapshot.installation_key or data['sources'] != [list(v) for v in signature(snapshot)]:
+        if data['version'] not in (1,2) or data['installation'] != snapshot.installation_key or data['sources'] != [list(v) for v in signature(snapshot)]:
             raise ValueError('ゲームの読込元が変わっています。以前の作業ファイルを保管して、新しい編集を開始できます。')
         history = decode(data['history'])
+        if data['version'] == 2:
+            seen = set()
+            for edit in history:
+                for change in edit.changes:
+                    identity=(change.character,change.kind,change.key)
+                    if identity in seen:continue
+                    seen.add(identity)
+                    if change.kind not in ('macros','equipsets'):raise ValueError('Invalid draft target')
+                    character=next(c for c in session.baseline.characters if c.folder_id==change.character)
+                    values=getattr(character,change.kind)
+                    key=editing.macro_key if change.kind=='macros' else lambda e:(e.number,)
+                    index=next(i for i,v in enumerate(values) if key(v)==change.key)
+                    values[index]=change.before
+            session.working=deepcopy(session.baseline)
         cursor = data['cursor']
         if not isinstance(cursor, int) or not 0 <= cursor <= len(history):
             raise ValueError('作業履歴の位置が不正です。')
@@ -71,8 +86,8 @@ class DraftStore:
         try:
             if self._revision() != self.revision:
                 raise ValueError('別の画面で作業ファイルが更新されました。アプリを開き直してください。')
-            data = {'version': 1, 'installation': session.baseline.installation_key,
-                    'sources': signature(session.baseline), 'history': encode(session.history), 'cursor': session.cursor}
+            data = {'version': 2, 'installation': session.saved.installation_key,
+                    'sources': signature(session.saved), 'history': encode(session.history), 'cursor': session.cursor}
             temp = self.path.with_name(self.path.name + '.' + uuid4().hex + '.tmp')
             try:
                 with temp.open('x', encoding='utf-8') as stream:

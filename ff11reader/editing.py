@@ -25,6 +25,12 @@ def macro_key(macro):
     return macro.book, macro.palette, macro.bank, macro.key
 
 
+def contents(character):
+    """Semantic edit contents, independent of binary encoding and derived states."""
+    return ([(macro_key(m), m.title.display, tuple(l.display for l in m.lines)) for m in character.macros],
+            [(e.number, e.title.display, tuple((s.name,s.action,s.item_id,s.container,s.index) for s in e.slots)) for e in character.equipsets])
+
+
 def edit_macro(character, macro, title, lines):
     if len(lines) != 6 or any('\n' in s or '\r' in s or '\0' in s for s in [title, *lines]):
         raise ValueError('マクロは名前と6行で入力してください。')
@@ -52,12 +58,13 @@ class EditSession:
     def __init__(self, snapshot):
         self.baseline = deepcopy(snapshot)
         self.working = deepcopy(snapshot)
+        self.saved = deepcopy(snapshot)
         self.history = []
         self.cursor = 0
 
     @property
     def dirty(self):
-        return any(a.macros != b.macros or a.equipsets != b.equipsets for a, b in zip(self.baseline.characters, self.working.characters))
+        return any(contents(a) != contents(b) for a, b in zip(self.saved.characters, self.working.characters))
 
     def _apply(self, edit, reverse=False):
         working = deepcopy(self.working)
