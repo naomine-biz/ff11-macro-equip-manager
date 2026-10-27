@@ -81,7 +81,7 @@ class Editor:
 
     def save_macros(self,preview,backup_root):
         from .macro_saving import execute_macro_save
-        from .saving import require_game_closed, digest
+        from .saving import require_game_closed
         if preview!=self.prepare_macro_save(preview.character):raise ValueError('編集内容が変わりました。保存プレビューを開き直してください。')
         require_game_closed()
         self.store.save(self.session)  # Verify draft ownership and writable storage first.
@@ -92,6 +92,32 @@ class Editor:
         from .editing import macro_key
         from .domain import Text
         character.macros=[replace(m,lines=tuple(Text(changes[(macro_key(m),n)].after,changes[(macro_key(m),n)].replacement.hex(),'cp932') if (macro_key(m),n) in changes else line for n,line in enumerate(m.lines,1))) for m in character.macros]
+        return self._save_checkpoint(preview,backup_root,next_session,execute_macro_save)
+
+    def prepare_equipment_save(self,folder):
+        if self.blocked:raise ValueError(self.blocked)
+        from .equipment_saving import prepare_equipment_save
+        return prepare_equipment_save(self.session.saved,self.session.working,folder)
+
+    def save_equipment(self,preview,backup_root):
+        from .equipment_saving import execute_equipment_save
+        from .saving import require_game_closed
+        from .codecs import equipsets, BAGS
+        from .references import assess_equipment
+        if preview!=self.prepare_equipment_save(preview.character):raise ValueError('編集内容が変わりました。保存プレビューを開き直してください。')
+        require_game_closed()
+        self.store.save(self.session)
+        next_session=deepcopy(self.session)
+        character=next(c for c in next_session.saved.characters if c.folder_id==preview.character)
+        decoded={e.number:e for f in preview.files for e in equipsets(f.replacement,f.page)}
+        character.equipsets=[decoded.get(e.number,e) for e in character.equipsets]
+        sources={BAGS[Path(s['path']).name]:s for s in next_session.saved.sources if Path(s['path']).parent.name==preview.character and Path(s['path']).name in BAGS}
+        character.equipsets=assess_equipment(character,sources)
+        return self._save_checkpoint(preview,backup_root,next_session,execute_equipment_save)
+
+    def _save_checkpoint(self,preview,backup_root,next_session,execute_save):
+        from .saving import digest
+        saved=next_session.saved
         for source in saved.sources:
             file=next((f for f in preview.files if Path(f.target).resolve()==Path(source['path']).resolve()),None)
             if file:source['sha256']=digest(file.replacement)
@@ -102,7 +128,7 @@ class Editor:
         from .saving import atomic_replace
         atomic_replace(pending,json.dumps(data,ensure_ascii=False).encode('utf-8'))
         try:
-            backup=execute_macro_save(preview,backup_root)
+            backup=execute_save(preview,backup_root)
         except Exception as exc:
             try:unchanged=all(Path(f.target).read_bytes()==f.original for f in preview.files)
             except OSError:unchanged=False

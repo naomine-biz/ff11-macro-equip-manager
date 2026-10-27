@@ -91,3 +91,13 @@ def inspect_macro_set_links(snapshot, character):
     if not any(c is character for c in snapshot.characters):
         raise ValueError('Unknown character')
     return analyze_macro_sets(character)
+
+
+def inspect_wardrobe_usage(snapshot, character):
+    from .wardrobe_usage import inspect_wardrobes
+    import re
+    if not any(c is character for c in snapshot.characters):raise ValueError('Unknown character')
+    incomplete=any(d.get('code')=='source_unreadable' and Path(d.get('path','')).parent.name==character.folder_id
+                   and re.fullmatch(r'(?:mcr(?:\d+)?|es\d+)\.dat',Path(d.get('path','')).name,re.I)
+                   for d in snapshot.diagnostics)
+    return inspect_wardrobes(character,snapshot.items,incomplete)
