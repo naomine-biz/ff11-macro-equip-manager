@@ -17,7 +17,7 @@ def execute_batch(plan, backup_root, root, validate, decode, kind, prefix, seria
     root=Path(root).resolve();backup_root=Path(backup_root).resolve()
     if backup_root.is_relative_to(root):raise ValueError('バックアップ先はゲームフォルダの外に指定してください。')
     targets={Path(f.target).resolve() for f in plan.files}
-    if not targets or len(targets)!=len(plan.files):raise ValueError('保存先が空または重複しています。')
+    if not targets or len(targets)!=len(plan.files):raise ValueError('保存対象がないか、保存先が重複しています。')
     with ExitStack() as stack:
         handles={};data={}
         for name,expected in plan.dependencies:
@@ -63,7 +63,7 @@ def execute_batch(plan, backup_root, root, validate, decode, kind, prefix, seria
                         if current==f.original:continue
                         if current!=f.replacement:raise ValueError('保存後に別の変更を検出')
                         restore(p,f.original)
-                        if p.read_bytes()!=f.original:raise OSError('復元後の内容が不一致')
+                        if p.read_bytes()!=f.original:raise OSError('復元後の内容が原本と一致しません。')
                     except Exception as rollback_error:failed.append(str(rollback_error))
                 write_record(folder/'failure.json',{'error':str(error),'rollback_errors':failed})
                 raise RuntimeError(f'保存を中止しました。復元確認: {"要確認" if failed else "完了"}。バックアップ: {folder}') from error

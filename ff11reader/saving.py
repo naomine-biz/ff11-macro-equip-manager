@@ -237,5 +237,5 @@ def restore_backup(folder):
         raise ValueError('復元直前にゲームデータが変わりました。')
     atomic_replace(target, original)
     if target.read_bytes() != original:
-        raise OSError('復元後検証失敗')
+        raise OSError('復元後の検証に失敗しました。')
     return target

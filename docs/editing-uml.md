@@ -2,7 +2,7 @@
 
 2026-10-28、段階1実装後のコードに対応。対象はドメイン値・個別編集・編集バッファ・作業保存・ゲームへの書戻し。参照検索の全UIやバイナリ解析の詳細は省略する。
 
-図の `<<module>>` はPythonのモジュール関数をまとめた表記であり、実装上のクラスではない。`*--` は所有する構成要素、`-->` は参照、`..>` は呼出し・利用を示す。属性・メソッドは主要なものを記載し、内部処理は各図の後の表で説明する。将来の一般保存サービスや移動・コピーはこの現行図に含めない。
+図の `<<module>>` は、同じPythonファイルに定義された関数のまとまりを表す。`*--` は所有する構成要素、`-->` は参照、`..>` は呼出し・利用を示す。属性・メソッドは主要なものを記載し、内部処理は各図の後の表で説明する。将来の一般保存サービスや移動・コピーはこの現行図に含めない。
 
 ## 1. ドメインの値
 
@@ -100,7 +100,7 @@ note for ItemReference "workingから再計算する派生属性。
 |---|---|
 | Snapshot | 読込結果と辞書・原本指紋を保持する。編集セッションが3つの独立したコピーを持つ |
 | Character | キャラ単位のデータを保持する可変コンテナ。equipment_referencesはkeep/remove以外の枠をEquipmentReferenceで包んで返す |
-| Macro / Equipset / Text / Slot | frozen dataclass。値の保持を担当し、編集時は新しい値へ差し替える。コンストラクター単体には編集の全検証を置いていない |
+| Macro / Equipset / Text / Slot | frozen dataclass。値の保持を担当し、編集時は新しい値へ差し替える。編集時の構造検証はedit_valuesが担当する |
 | ItemReference | 観測結果・候補とドメインの参照状態を保持する。references.assess_equipmentが生成する |
 | InventoryRow | ローカルから観測した持ち物の参照元。現在は編集対象外。数量・オーグメントに取得不能の値がある |
 | EquipmentReference | 検索・表示用の互換ビュー。slot、expected_item_id、container、index、status、observed_item_ids、candidates、inventory_source、certaintyはpieceへ委譲する |
@@ -199,7 +199,7 @@ EditingOperations ..> EditValues
 EditSession ..> EditValues
 DraftStore ..> EditSession : 再構築と直列化
 note for Editor "sessionとsnapshotはdeepcopyを返す。
-内部セッションの公開は作業保存成功後。"
+作業保存が成功してから内部状態を更新する。"
 note for EditSession "baseline: 履歴起点
 working: 編集結果
 saved: 最後に保存成功した状態"
@@ -214,7 +214,7 @@ saved: 最後に保存成功した状態"
 | edit_status | cursor・履歴数・dirtyを返す。UIのUndo／Redo有効状態と変更表示に使用 |
 | prepare_macro_edit | blocked確認 → 内部workingからキャラ・座標でマクロを取得 → edit_macroで案を作成 → コピーを返す |
 | apply / undo / redo | _executeへEditSessionの対応操作を渡す |
-| _execute | blocked・pending確認 → セッション全体をコピー → 操作 → DraftStore.save → コピーを内部セッションとして公開。操作・作業保存の失敗では公開済み状態を保持 |
+| _execute | blocked・pending確認 → セッション全体をコピー → 操作 → DraftStore.save → 内部セッションをコピーの内容へ更新。操作・作業保存の失敗では現在の状態を保持 |
 | macro_fixes | 現在のworkingで補正案を再計算 → プレビューとの一致確認 → apply |
 | equipment_fixes | plan_equipment_editで現在の補正案を検証してEdit化 → apply |
 | start_fresh | pendingがあれば中止 → 作業ファイルをarchive → 現セッションのsavedから再開始。ディスクの再読込は行わない |
@@ -227,7 +227,7 @@ saved: 最後に保存成功した状態"
 | EditSession.__init__ | 入力Snapshotをbaseline・working・savedへ個別にdeepcopyし、空履歴とcursor=0を用意 |
 | dirty | snapshot_value(saved)とsnapshot_value(working)を比較。キャラ・対象のキー集合も含む |
 | apply | Edit/Changeの型・構造・キー・重複を検証 → _apply → 意味上の無変更を履歴から除外 → cursor以降のRedo履歴を置換 → cursorを進める |
-| _apply | workingのキー重複を確認 → コピー作成 → 全変更の対象・beforeの意味上の一致・afterのキーを確認 → 値を差替え → 全キャラの装備参照状態を再判定 → workingを公開。途中エラーではコピーを公開しない |
+| _apply | workingのキー重複を確認 → コピー作成 → 全変更の対象・beforeの意味上の一致・afterのキーを確認 → 値を差替え → 全キャラの装備参照状態を再判定 → workingを更新。途中エラーでは元のworkingを保持する |
 | undo / redo | cursorの前／現在のEditを_applyへ渡す。Undoはbefore/afterを逆に適用。成功後にcursorを移動する |
 | edit_macro | 6行・改行/NULを検証。未変更Textを保持し、変更Textをraw_hex空・state=draftで作る。1マクロのChangeを返す |
 | plan_macro_fixes | /equip参照を判定 → 補正可能な行をマクロごとにまとめる → 対象行を置換したChange群を1つのEditにする |
@@ -366,7 +366,7 @@ note for FileTransaction "対象別の補正ルールはコールバック。
 ロック・バックアップ・置換・検証・復元を共通実行。"
 ```
 
-保存計画は編集履歴から書込命令を再生せず、savedとworkingの意味上の差から作る。現在の返り値はバックアップ先Path。一般化した保存結果オブジェクトは後続段階の設計対象。
+保存計画は、最後に保存した状態（saved）と現在の編集内容（working）の差から作る。現在の返り値はバックアップ先Path。各保存処理に共通する結果オブジェクトは後続段階の設計対象。
 
 | メソッド／関数 | 内部処理と境界 |
 |---|---|
@@ -418,7 +418,7 @@ User->>UI: アプリ内に適用
 UI->>E: apply(edit)
 E->>E: blocked/pending確認とセッション複製
 E->>S: apply(edit)
-S->>S: 型・構造・前提検証、全変更適用、参照再計算
+S->>S: 型・構造・前提を検証し、全変更を適用して参照を再計算
 S->>S: 履歴・cursor更新
 E->>D: save(次セッション)
 alt 作業保存成功
@@ -427,7 +427,7 @@ alt 作業保存成功
  UI->>E: snapshot() / edit_status()
  E-->>UI: 表示用コピーと状態
 else 検証または保存失敗
- Note over E,D: 公開済みセッションを保持してエラー表示
+ Note over E,D: 現在のセッションを保持してエラー表示
 end
 ```
 
@@ -449,7 +449,7 @@ User->>UI: バックアップして保存
 UI->>E: save_*(preview)
 E->>A: 計画を再生成して比較
 E->>E: ゲーム終了確認
-E->>D: 現セッション保存で所有権・書込可否を確認
+E->>D: 現セッション保存で別のアプリによる更新の有無と書込み可否を確認
 E->>E: 次セッションのsavedと原本指紋を準備
 E->>D: pendingに次状態とdraft_revisionを記録
 E->>A: execute_*(preview)
@@ -482,7 +482,7 @@ else 書込み失敗
 end
 ```
 
-準備したnext_session.savedは保存前には公開されない。ゲームへの書込みと検証、作業ファイルへの同期が成功してからEditorの内部状態を切り替える。複数ファイルの置換は一括で原子的にはならないため、バックアップ・pending・再起動時復旧で途中状態を扱う。
+next_session.savedには、保存に成功した後の状態を準備しておく。ゲームへの書込みと検証、作業ファイルへの同期が成功したら、Editorの内部状態をこのコピーへ切り替える。複数ファイルの置換は一つずつ行うため、バックアップ・pending・再起動時復旧で途中状態を扱う。
 
 ## コードの対応表
 

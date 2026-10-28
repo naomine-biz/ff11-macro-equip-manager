@@ -181,7 +181,7 @@ class MacroSavingTests(unittest.TestCase):
             window=next(w for w in app.winfo_children() if isinstance(w,tk.Toplevel))
             detail=next(w for w in window.winfo_children() if isinstance(w,tk.Text)).get('1.0','end')
             self.assertIn('名前',detail);self.assertIn('未対応',detail)
-            self.assertIn('作業データに保持',detail)
+            self.assertIn('作業データに残す',detail)
             for f in self.plan.files:self.assertEqual(Path(f.target).read_bytes(),f.original)
         finally:app.destroy()
 

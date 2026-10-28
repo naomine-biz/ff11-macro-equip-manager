@@ -21,13 +21,13 @@ ACTION_STYLE = {
  'needs_review': ('要確認', '#101e36', '#c6a5ee'),
  'not_applicable': ('', '#0d172c', '#7e8ca9'),
 }
-OBSERVATIONS = {'cache_match':'保存位置と種類IDがインベントリ保存情報上で一致',
- 'cache_item_mismatch':'保存位置の種類IDとインベントリ保存情報が異なる',
- 'cache_position_empty':'保存位置にインベントリ保存情報行がない',
- 'cache_unavailable':'対象収納のインベントリ保存情報を取得できていない',
+OBSERVATIONS = {'cache_match':'登録した位置と種類IDが持ち物データと一致',
+ 'cache_item_mismatch':'登録した位置にあるアイテムの種類IDが異なる',
+ 'cache_position_empty':'登録した位置にアイテムが見つからない',
+ 'cache_unavailable':'対象の収納データを読み取れていない',
  'invalid_reference':'保存された参照値が想定範囲外',
- 'unknown_action':'装備動作の意味が未確認',
- 'ambiguous_position':'同一位置の観測が重複', 'unassessed':'未評価', 'not_applicable':'対象外'}
+ 'unknown_action':'装備枠の動作を判別できない',
+ 'ambiguous_position':'同じ収納・位置のデータが重複', 'unassessed':'未評価', 'not_applicable':'対象外'}
 BAGS={0:'マイバッグ',1:'モグ金庫',2:'収納家具',3:'一時アイテム',4:'ロッカー',5:'サッチェル',6:'サック',7:'ケース',8:'ワードローブ1',9:'モグ金庫2',**{i+8:f'ワードローブ{i}' for i in range(2,9)}}
 SLOTS={'main':'メイン','sub':'サブ','range':'遠隔','ammo':'矢弾','head':'頭','neck':'首','ear1':'左耳','ear2':'右耳','body':'胴','hands':'両手','ring1':'左指','ring2':'右指','back':'背','waist':'腰','legs':'両脚','feet':'両足'}
 GRID='main sub range ammo head neck ear1 ear2 body hands ring1 ring2 back waist legs feet'.split()
@@ -110,7 +110,7 @@ class ReaderWindow:
   self.detail.pack(fill='both',expand=True)
   self.detail.tag_configure('title',font=('MS Gothic',13,'bold'),foreground='#fff1c0')
   self.evidence=None
-  self.details_button=ttk.Button(right,text='注意・根拠などの詳細',command=self.show_evidence,state='disabled');self.details_button.pack(fill='x',pady=(8,0))
+  self.details_button=ttk.Button(right,text='判定の詳細',command=self.show_evidence,state='disabled');self.details_button.pack(fill='x',pady=(8,0))
   self.actions=ttk.Frame(right);self.actions.pack(fill='x',pady=8)
   self.candidate_menu=tk.Menu(app,tearoff=False,bg='#101b38',fg='#edf1fa')
   self.candidate_button=ttk.Menubutton(self.actions,text='候補を見る',menu=self.candidate_menu,state='disabled')
@@ -155,7 +155,7 @@ class ReaderWindow:
   plan=preview_reference_fixes(self.snapshot,c)
   window=tk.Toplevel(self.app,background='#080f22');window.title('装備セットの参照位置を補正 / プレビュー');window.geometry('950x650')
   ttk.Label(window,text=f'{c.folder_id}  ·  更新案 {len(plan.changes)}枠  ·  保留 {len(plan.issues)}枠',padding=12).pack(anchor='w')
-  ttk.Label(window,text='アプリ内の作業データに適用する変更案です。変更前と変更後を確認してください。',padding=8).pack(anchor='w')
+  ttk.Label(window,text='変更前後を確認して、アプリ内の作業データに適用してください。',padding=8).pack(anchor='w')
   text=tk.Text(window,wrap='word',bg='#101b38',fg='#edf1fa',font=('MS Gothic',11),padx=12,pady=12)
   text.pack(fill='both',expand=True,padx=12)
   for x in plan.changes:
@@ -209,8 +209,8 @@ class ReaderWindow:
   except (OSError,ValueError,RuntimeError) as e:messagebox.showerror('保存プレビュー',str(e),parent=self.app);return
   window=tk.Toplevel(self.app,background='#080f22');window.title('マクロ収納番号Fix / ゲームへの保存');window.geometry('980x680')
   count=sum(len(f.changes) for f in plan.files)
-  ttk.Label(window,text=f'{self.character.display_name or self.character.folder_id} · {count}行 / {len(plan.files)}ファイル · その他のマクロ編集 {plan.deferred}件は作業データに保持',padding=10).pack(anchor='w')
-  ttk.Label(window,text='保存が完了するまでFF11・PlayOnlineを終了した状態にしてください。全対象をバックアップ後に保存します。',padding=10).pack(anchor='w')
+  ttk.Label(window,text=f'{self.character.display_name or self.character.folder_id} · {count}行 / {len(plan.files)}ファイル · 保留 {plan.deferred}件（詳細は下記）',padding=10).pack(anchor='w')
+  ttk.Label(window,text='FF11とPlayOnlineを終了してから保存してください。対象ファイルをすべてバックアップして保存します。保存完了まではゲームを起動しないでください。',padding=10).pack(anchor='w')
   text=tk.Text(window,bg='#101b38',fg='#edf1fa',wrap='word',padx=12,pady=12)
   bar=ttk.Scrollbar(window,command=text.yview);text.configure(yscrollcommand=bar.set);bar.pack(side='right',fill='y');text.pack(fill='both',expand=True)
   for file in plan.files:
@@ -219,7 +219,7 @@ class ReaderWindow:
     b,p,bank,key=change.address
     text.insert('end',f'ブック {b:02} / パレット {p} / {bank.upper()} {key if key<10 else 0} / {change.line}行目\n  前: {change.before}\n  後: {change.after}\n\n')
   if plan.deferred_changes:
-   text.insert('end','作業データに保持する変更\n')
+   text.insert('end','作業データに残す変更\n')
    for change in plan.deferred_changes:text.insert('end',f'{change.target}: {change.reason}\n')
   text.configure(state='disabled')
   def save():
@@ -235,8 +235,8 @@ class ReaderWindow:
   except (OSError,ValueError,RuntimeError) as e:messagebox.showerror('保存プレビュー',str(e),parent=self.app);return
   window=tk.Toplevel(self.app,background='#080f22');window.title('装備セットの補正 / ゲームへの保存');window.geometry('980x680')
   count=sum(len(f.changes) for f in plan.files)
-  ttk.Label(window,text=f'{self.character.display_name or self.character.folder_id} · {count}枠 / {len(plan.files)}ファイル · その他の装備セット編集 {plan.deferred}件は作業データに保持',padding=10).pack(anchor='w')
-  ttk.Label(window,text='保存が完了するまでFF11・PlayOnlineを終了した状態にしてください。全対象をバックアップ後に保存します。',padding=10).pack(anchor='w')
+  ttk.Label(window,text=f'{self.character.display_name or self.character.folder_id} · {count}枠 / {len(plan.files)}ファイル · 保留 {plan.deferred}件（詳細は下記）',padding=10).pack(anchor='w')
+  ttk.Label(window,text='FF11とPlayOnlineを終了してから保存してください。対象ファイルをすべてバックアップして保存します。保存完了まではゲームを起動しないでください。',padding=10).pack(anchor='w')
   text=tk.Text(window,bg='#101b38',fg='#edf1fa',wrap='word',padx=12,pady=12)
   bar=ttk.Scrollbar(window,command=text.yview);text.configure(yscrollcommand=bar.set);bar.pack(side='right',fill='y');text.pack(fill='both',expand=True)
   for file in plan.files:
@@ -244,7 +244,7 @@ class ReaderWindow:
    for change in file.changes:
     text.insert('end',f'{self.equipset_label(change.equipset,self.character)} / {SLOTS[change.slot]} / {self.item_name(change.item_id)} (ID {change.item_id})\n  前: {BAGS.get(change.before[0],change.before[0])} / 位置 {change.before[1]}\n  後: {BAGS[change.after[0]]} / 位置 {change.after[1]}\n\n')
   if plan.deferred_changes:
-   text.insert('end','作業データに保持する変更\n')
+   text.insert('end','作業データに残す変更\n')
    for change in plan.deferred_changes:text.insert('end',f'{change.target}: {change.reason}\n')
   text.configure(state='disabled')
   def save():
@@ -401,9 +401,9 @@ class ReaderWindow:
   text=f'{label}\n{view.instruction}\n\n'
   if slot.action in ('keep','remove'):text+='動作: '+('変更しない' if slot.action=='keep' else '装備を外す')
   else:
-   text+=f'登録アイテム\n{self.item_name(slot.item_id)}\n種類ID: {slot.item_id}\n収納: {BAGS.get(slot.container,slot.container)}\n内部スロット: {slot.index}\n\n保存値の観測\n{OBSERVATIONS.get(a.observation,a.observation)}\n'
+   text+=f'登録アイテム\n{self.item_name(slot.item_id)}\n種類ID: {slot.item_id}\n収納: {BAGS.get(slot.container,slot.container)}\n内部スロット: {slot.index}\n\n持ち物データとの照合結果\n{OBSERVATIONS.get(a.observation,a.observation)}\n'
    for item in a.observed_item_ids:text+=f'指定位置のインベントリ保存情報: {item} {self.item_name(item)}\n'
-   text+='\n同じ種類IDの候補\n'+('\n'.join(f'{BAGS.get(b,b)} / 内部スロット {i}' for b,i in a.candidates) or 'インベントリ保存情報内に候補なし')
+   text+='\n同じ種類IDの候補\n'+('\n'.join(f'{BAGS.get(b,b)} / 内部スロット {i}' for b,i in a.candidates) or '持ち物データに候補なし')
    text+='\n\n照合対象: ローカルに保存されたインベントリ情報'
   if a.inventory_source:
    source=a.inventory_source;stamp=datetime.fromtimestamp(source['mtime_ns']/1e9).astimezone().isoformat()
@@ -537,7 +537,7 @@ class ReaderWindow:
   if not c:return
   report=inspect_macro_set_links(self.snapshot,c)
   window=tk.Toplevel(self.app,background='#080f22');window.title('マクロと装備セットの参照確認');window.geometry('950x620')
-  ttk.Label(window,text='同じキャラの読み取れたマクロ内の /equipset・/lockstyleset を確認します。',padding=10).pack(anchor='w')
+  ttk.Label(window,text='読み取ったマクロの /equipset・/lockstyleset を、同じキャラの装備セットと照合します。',padding=10).pack(anchor='w')
   ttk.Label(window,text='一覧で選択して「開く」を押すと、対象へ移動します。',padding=10).pack(anchor='w')
   notebook=ttk.Notebook(window);notebook.pack(fill='both',expand=True,padx=10,pady=10)
   sets={e.number:e for e in c.equipsets}

@@ -120,7 +120,7 @@ def prepare_macro_save(saved,working,folder):
             if a.display==b.display:continue
             ref=refs.get((key,n))
             if ref is None or ref.replacement is None or ref.replacement!=b.display:
-                deferred.append(DeferredChange(address+f' / {n}行目','現在の一意な収納番号補正と一致しません。任意の行編集の保存は未対応です。'));continue
+                deferred.append(DeferredChange(address+f' / {n}行目','この行は自動補正の保存対象外です。現在保存できるのは、参照先が1つに決まる収納番号の補正です。'));continue
             raw=bytes.fromhex(a.raw_hex)
             try:replacement=patch_line(raw,a.display,b.display,resolver)
             except ValueError as exc:
@@ -183,14 +183,14 @@ def restore_macro_backup(folder,apply=False):
         name='mcr'+(str(page) if page else '')+'.dat'
         if target.name!=name or target.parent.name!=receipt['character'] or target.parent.parent.name.upper()!='USER':raise ValueError('復元先が不正です。')
         if root is None:root=target.parent.parent.parent
-        if target.parent.parent.parent!=root or target in seen:raise ValueError('復元先が重複または複数のインストール先にあります。')
+        if target.parent.parent.parent!=root or target in seen:raise ValueError('復元先に重複があるか、異なるインストール先のファイルが含まれています。')
         seen.add(target)
         backup=(folder/entry['backup']).resolve()
         if backup.parent!=folder:raise ValueError('バックアップのパスが不正です。')
         raw=backup.read_bytes()
         if digest(raw)!=entry['before_sha256']:raise ValueError('バックアップが破損しています。')
         macros(raw,page)
-        if digest(target.read_bytes()) not in (entry['before_sha256'],entry['after_sha256']):raise ValueError('保存後に別の変更があり、復元を保留しました。')
+        if digest(target.read_bytes()) not in (entry['before_sha256'],entry['after_sha256']):raise ValueError('保存後にファイルが変更されたため、復元を保留しました。')
         entries.append((target,raw,entry))
     if not apply:return tuple(str(p) for p,_,_ in entries)
     require_game_closed()

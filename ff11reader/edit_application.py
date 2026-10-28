@@ -43,7 +43,7 @@ class Editor:
             current=json.loads(self.store.path.read_text(encoding='utf-8')) if self.store.path.exists() else {}
             if all(current.get(k)==data.get(k) for k in ('version','installation','sources','history','cursor')):
                 pending.unlink();return
-            raise ValueError('保存途中の記録と作業ファイルの更新が競合しています。作業ファイルとpending記録を保管して確認してください。')
+            raise ValueError('保存途中の記録と現在の作業ファイルが一致しません。作業ファイルと復旧用のpending記録を保管して確認してください。')
         from .draft_store import signature
         if data['sources']==[list(v) for v in signature(snapshot)]:
             session=DraftStore(pending).load(snapshot)
@@ -55,7 +55,7 @@ class Editor:
     def _execute(self, operation):
         if self.blocked:
             raise ValueError(self.blocked)
-        if self.store.path.with_suffix('.pending.json').exists():raise ValueError('ゲーム保存の処理・復旧確認中です。')
+        if self.store.path.with_suffix('.pending.json').exists():raise ValueError('ゲームへの保存または復旧が終わるまで、編集を再開できません。')
         next_session = deepcopy(self._session)
         operation(next_session)
         self.store.save(next_session)
@@ -147,7 +147,7 @@ class Editor:
             except OSError:unchanged=False
             if unchanged:pending.unlink()
             else:
-                self.blocked='ゲーム保存の復旧確認が必要です。バックアップとpending記録を保持しています。'
+                self.blocked='ゲームへの保存が途中で止まっています。バックアップと復旧用のpending記録を残しています。復旧確認が必要です。'
                 raise RuntimeError(self.blocked+' '+str(exc)) from exc
             raise
         try:
@@ -155,6 +155,6 @@ class Editor:
             self._session=next_session
             pending.unlink()
         except Exception as exc:
-            self.blocked=f'ゲームへの保存は完了しました。作業状態の再開確認が必要です。バックアップ: {backup}'
+            self.blocked=f'ゲームへの保存は完了しましたが、作業ファイルの同期に失敗しました。アプリを再起動して復旧を確認してください。バックアップ: {backup}'
             raise RuntimeError(self.blocked) from exc
         return backup

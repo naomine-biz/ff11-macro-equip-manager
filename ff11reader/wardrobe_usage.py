@@ -58,7 +58,7 @@ def inspect_wardrobes(character, items, incomplete=False):
         elif possible[identity]:state='possible';refs=possible[identity]
         elif (incomplete or character.inventory_coverage.get(row.container)!='loaded' or
               not items.get(row.item_id,{}).get('name') or not 1<=row.index<=80 or len(positions[row.container,row.index])!=1):
-            state='incomplete';refs=['読取不足・未解決の参照情報を確認してください。']
+            state='incomplete';refs=['読み取れないデータや参照先を特定できない情報があるため、未参照か判断できません。']
         else:state='unreferenced';refs=[]
         result.append(WardrobeUsage(row,state,tuple(refs)))
     return tuple(result)

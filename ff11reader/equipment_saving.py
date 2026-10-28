@@ -46,7 +46,7 @@ def prepare_equipment_save(saved, working, folder):
             if values(a)==values(b):continue
             change=allowed.get((e.number,a.name))
             if change is None or values(b)!=(a.name,a.action,a.item_id,*change.after):
-                deferred.append(DeferredChange(address+' / '+a.name,'現在の一意な参照位置補正と一致しません。枠の任意編集の保存は未対応です。'));continue
+                deferred.append(DeferredChange(address+' / '+a.name,'この枠は自動補正の保存対象外です。現在保存できるのは、同じ種類IDの候補が1つに決まる位置の補正です。'));continue
             grouped.setdefault((e.number-1)//20,[]).append(change)
     if not grouped:raise ValueError('保存できる参照位置の補正がありません。先に補正案を作業データへ適用してください。'+('\n'+deferred_text(deferred) if deferred else ''))
     records={Path(s['path']).resolve():s for s in saved.sources}
@@ -113,14 +113,14 @@ def restore_equipment_backup(folder,apply=False):
         name=f'es{page}.dat'
         if target.name!=name or target.parent.name!=receipt['character'] or target.parent.parent.name.upper()!='USER':raise ValueError('復元先が不正です。')
         if root is None:root=target.parent.parent.parent
-        if target.parent.parent.parent!=root or target in seen:raise ValueError('復元先が重複または複数のインストール先にあります。')
+        if target.parent.parent.parent!=root or target in seen:raise ValueError('復元先に重複があるか、異なるインストール先のファイルが含まれています。')
         seen.add(target)
         backup=(folder/entry['backup']).resolve()
         if backup.parent!=folder:raise ValueError('バックアップのパスが不正です。')
         raw=backup.read_bytes()
         if digest(raw)!=entry['before_sha256']:raise ValueError('バックアップが破損しています。')
         equipsets(raw,page)
-        if digest(target.read_bytes()) not in (entry['before_sha256'],entry['after_sha256']):raise ValueError('保存後に別の変更があり、復元を保留しました。')
+        if digest(target.read_bytes()) not in (entry['before_sha256'],entry['after_sha256']):raise ValueError('保存後にファイルが変更されたため、復元を保留しました。')
         entries.append((target,raw,entry))
     if not apply:return tuple(str(p) for p,_,_ in entries)
     require_game_closed()
