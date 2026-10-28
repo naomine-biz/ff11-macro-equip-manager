@@ -7,7 +7,7 @@ from .application import set_character_label, preview_reference_fixes
 from .presentation import present_slot
 from .macro_links import is_empty
 from .edit_application import Editor
-from .editing import edit_macro, plan_macro_fixes, macro_key
+from .editing import plan_macro_fixes, macro_key
 from .macro_inventory import assess_macro_inventory, LABELS as MACRO_ITEM_LABELS
 from .application import inspect_macro_set_links, inspect_wardrobe_usage
 from pathlib import Path
@@ -36,7 +36,7 @@ GRID='main sub range ammo head neck ear1 ear2 body hands ring1 ring2 back waist 
 class ReaderWindow:
  def __init__(self, app, snapshot):
   self.app=app;self.snapshot=snapshot;self.photos={};self.card_widgets={};self.navigation=[];self.selected=None
-  self.editor=Editor(snapshot);self.snapshot=self.editor.session.working;self.active_macro=None
+  self.editor=Editor(snapshot);self.snapshot=self.editor.snapshot();self.active_macro=None
   app.title('FF11 ワークスペース 0.9');app.geometry('1440x900');app.minsize(1120,720);app.configure(bg='#080f22')
   style=ttk.Style(app);style.theme_use('clam')
   app.option_add('*Font',('MS Gothic',10));app.option_add('*TCombobox*Listbox.background','#111f40');app.option_add('*TCombobox*Listbox.foreground','#f4f5f8');app.option_add('*TCombobox*Listbox.selectBackground','#354b7a')
@@ -174,13 +174,13 @@ class ReaderWindow:
   ttk.Button(window,text='この案をアプリ内に適用（ゲームへの保存なし）',command=apply,state='normal' if plan.changes else 'disabled').pack(side='right',padx=12,pady=12)
   ttk.Button(window,text='閉じる',command=window.destroy).pack(side='right',pady=12)
  def update_edit_status(self):
-  session=self.editor.session
-  self.undo_button.configure(state='normal' if session.cursor and not self.editor.blocked else 'disabled')
-  self.redo_button.configure(state='normal' if session.cursor<len(session.history) and not self.editor.blocked else 'disabled')
-  self.draft_label.configure(text='作業再開の確認が必要' if self.editor.blocked else f'編集中 {session.cursor}操作 · '+('変更あり' if session.dirty else '保存済み状態'))
+  cursor,history_length,dirty=self.editor.edit_status()
+  self.undo_button.configure(state='normal' if cursor and not self.editor.blocked else 'disabled')
+  self.redo_button.configure(state='normal' if cursor<history_length and not self.editor.blocked else 'disabled')
+  self.draft_label.configure(text='作業再開の確認が必要' if self.editor.blocked else f'編集中 {cursor}操作 · '+('変更あり' if dirty else '保存済み状態'))
  def refresh_edits(self):
   selected=self.selected;address=self.active_macro
-  self.snapshot=self.editor.session.working
+  self.snapshot=self.editor.snapshot()
   self.change_mode()
   if self.mode.get()=='マクロ' and address:
    item=f'palette-{address[0]}-{address[1]}'
@@ -218,6 +218,9 @@ class ReaderWindow:
    for change in file.changes:
     b,p,bank,key=change.address
     text.insert('end',f'ブック {b:02} / パレット {p} / {bank.upper()} {key if key<10 else 0} / {change.line}行目\n  前: {change.before}\n  後: {change.after}\n\n')
+  if plan.deferred_changes:
+   text.insert('end','作業データに保持する変更\n')
+   for change in plan.deferred_changes:text.insert('end',f'{change.target}: {change.reason}\n')
   text.configure(state='disabled')
   def save():
    button.configure(state='disabled');window.update_idletasks()
@@ -240,6 +243,9 @@ class ReaderWindow:
    text.insert('end',file.target+'\n')
    for change in file.changes:
     text.insert('end',f'{self.equipset_label(change.equipset,self.character)} / {SLOTS[change.slot]} / {self.item_name(change.item_id)} (ID {change.item_id})\n  前: {BAGS.get(change.before[0],change.before[0])} / 位置 {change.before[1]}\n  後: {BAGS[change.after[0]]} / 位置 {change.after[1]}\n\n')
+  if plan.deferred_changes:
+   text.insert('end','作業データに保持する変更\n')
+   for change in plan.deferred_changes:text.insert('end',f'{change.target}: {change.reason}\n')
   text.configure(state='disabled')
   def save():
    button.configure(state='disabled');window.update_idletasks()
@@ -445,7 +451,7 @@ class ReaderWindow:
    ttk.Label(row,text=label,width=8).pack(side='left')
    entry=tk.Entry(row,bg='#101b38',fg='#edf1fa',insertbackground='white');entry.insert(0,value);entry.pack(side='left',fill='x',expand=True);entries.append(entry)
   def preview():
-   try:edit=edit_macro(c,macro,entries[0].get(),[e.get() for e in entries[1:]])
+   try:edit=self.editor.prepare_macro_edit(c.folder_id,macro_key(macro),entries[0].get(),[e.get() for e in entries[1:]])
    except ValueError as e:messagebox.showerror('入力内容',str(e),parent=window);return
    self.preview_edit(edit,lambda:self.editor.apply(edit),window)
   ttk.Button(window,text='変更案を確認',command=preview).pack(pady=12)

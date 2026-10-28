@@ -91,6 +91,9 @@ class MacroSavingTests(unittest.TestCase):
         lines=[l.display for l in m.lines];lines[1]='/echo custom'
         self.editor.apply(edit_macro(c,m,'Renamed',lines))
         plan=self.editor.prepare_macro_save('abc');self.assertEqual(plan.deferred,2)
+        self.assertIn('名前',plan.deferred_changes[0].target)
+        self.assertIn('2行目',plan.deferred_changes[1].target)
+        self.assertTrue(all(c.reason for c in plan.deferred_changes))
         self.editor.save_macros(plan,self.base/'backups')
         self.assertTrue(self.editor.session.dirty)
         game=self.load().characters[0].macros[0]
@@ -164,6 +167,29 @@ class MacroSavingTests(unittest.TestCase):
             self.assertFalse(view.editor.session.dirty);self.assertFalse(errors,errors)
             for f in self.plan.files:self.assertEqual(Path(f.target).read_bytes(),f.replacement)
         finally:app.destroy()
+
+    @unittest.skipUnless(os.environ.get('FF11_RUN_INTEGRATION')=='1','Enable Tk integration checks')
+    def test_gui_shows_deferred_target_and_reason(self):
+        import tkinter as tk
+        from ff11reader.ui import ReaderWindow
+        c=self.editor.session.working.characters[0];m=c.macros[0]
+        self.editor.apply(edit_macro(c,m,'Renamed',[l.display for l in m.lines]))
+        app=tk.Tk();app.withdraw()
+        try:
+            with patch('ff11reader.ui.Editor',return_value=self.editor):view=ReaderWindow(app,self.source)
+            view.preview_game_save();app.update()
+            window=next(w for w in app.winfo_children() if isinstance(w,tk.Toplevel))
+            detail=next(w for w in window.winfo_children() if isinstance(w,tk.Text)).get('1.0','end')
+            self.assertIn('名前',detail);self.assertIn('未対応',detail)
+            self.assertIn('作業データに保持',detail)
+            for f in self.plan.files:self.assertEqual(Path(f.target).read_bytes(),f.original)
+        finally:app.destroy()
+
+    def test_deferred_only_has_targets_and_reasons(self):
+        self.editor.undo()
+        c=self.editor.session.working.characters[0];m=c.macros[0]
+        self.editor.apply(edit_macro(c,m,'New',[l.display for l in m.lines]))
+        with self.assertRaisesRegex(ValueError,'名前.*未対応'):self.editor.prepare_macro_save('abc')
 
     def test_token_zero_bytes_japanese_padding_and_length_limit(self):
         token=bytes.fromhex('fd02000201fd')

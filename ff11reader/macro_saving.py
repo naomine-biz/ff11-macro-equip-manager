@@ -13,6 +13,8 @@ from .domain import Text
 from .editing import macro_key
 from .macro_inventory import assess_macro_inventory, parse_equip
 from .saving import digest, locked_read, atomic_replace, require_game_closed
+from .file_transaction import execute_batch, write_json
+from .save_plan import DeferredChange, deferred_text, require_same_targets
 
 
 @dataclass(frozen=True)
@@ -39,7 +41,10 @@ class MacroSavePlan:
     character: str
     files: tuple
     dependencies: tuple
-    deferred: int = 0
+    deferred_changes: tuple = ()
+
+    @property
+    def deferred(self):return len(self.deferred_changes)
 
 
 def patch_line(raw, before, after, resolver):
@@ -95,6 +100,7 @@ def prepare_macro_save(saved,working,folder):
     from .dictionaries import resolve_token
     original=next(c for c in saved.characters if c.folder_id==folder)
     edited=next(c for c in working.characters if c.folder_id==folder)
+    require_same_targets(original,edited)
     records={Path(s['path']).resolve():s for s in saved.sources}
     parent=next((p.parent for p in records if p.parent.name==folder and p.parent.parent.name.upper()=='USER'),None)
     if parent is None or not re.fullmatch('[0-9a-fA-F]+',folder):raise ValueError('キャラクターの保存先を確認してください。')
@@ -105,22 +111,23 @@ def prepare_macro_save(saved,working,folder):
         p=Path(source['path']).resolve()
         if p not in records or source['sha256']!=records[p]['sha256']:raise ValueError('定型文データが変わりました。再読み込みしてください。')
     refs={(r.address,r.line):r for r in assess_macro_inventory(original,saved.items)}
-    old={macro_key(m):m for m in original.macros};grouped={};deferred=0
+    old={macro_key(m):m for m in original.macros};grouped={};deferred=[]
     for macro in edited.macros:
         key=macro_key(macro);before=old[key]
-        deferred+=before.title.display!=macro.title.display
+        address=f'ブック {macro.book:02} / パレット {macro.palette} / {macro.bank.upper()} {macro.key}'
+        if before.title.display!=macro.title.display:deferred.append(DeferredChange(address+' / 名前','マクロ名の保存は未対応です。'))
         for n,(a,b) in enumerate(zip(before.lines,macro.lines),1):
             if a.display==b.display:continue
             ref=refs.get((key,n))
             if ref is None or ref.replacement is None or ref.replacement!=b.display:
-                deferred+=1;continue
+                deferred.append(DeferredChange(address+f' / {n}行目','現在の一意な収納番号補正と一致しません。任意の行編集の保存は未対応です。'));continue
             raw=bytes.fromhex(a.raw_hex)
             try:replacement=patch_line(raw,a.display,b.display,resolver)
             except ValueError as exc:
                 raise ValueError(f'ブック {macro.book:02} / パレット {macro.palette} / {macro.bank.upper()} {macro.key if macro.key<10 else 0} / {n}行目: {exc}') from exc
             page=(macro.book-1)*10+macro.palette-1
             grouped.setdefault(page,[]).append(LineChange(key,n,a.display,b.display,raw,replacement))
-    if not grouped:raise ValueError('保存できる収納番号Fixがありません。先にFixを作業データへ適用してください。')
+    if not grouped:raise ValueError('保存できる収納番号Fixがありません。先にFixを作業データへ適用してください。'+('\n'+deferred_text(deferred) if deferred else ''))
     files=[]
     for page,changes in sorted(grouped.items()):
         target=parent/('mcr'+(str(page) if page else '')+'.dat')
@@ -136,12 +143,7 @@ def prepare_macro_save(saved,working,folder):
         raw=p.read_bytes()
         if p not in records or digest(raw)!=records[p]['sha256']:raise ValueError('読込元が変更されています。再読み込みしてください。')
         dependencies.append((str(p),digest(raw)))
-    return MacroSavePlan(folder,tuple(files),tuple(dependencies),deferred)
-
-
-def write_json(path,value):
-    with path.open('x',encoding='utf-8') as stream:
-        json.dump(value,stream,ensure_ascii=False,indent=2);stream.flush();os.fsync(stream.fileno())
+    return MacroSavePlan(folder,tuple(files),tuple(dependencies),tuple(deferred))
 
 
 def execute_macro_save(plan,backup_root):
@@ -157,14 +159,7 @@ def execute_macro_save(plan,backup_root):
         p=Path(f.target).resolve()
         expected=root/'USER'/plan.character/('mcr'+(str(f.page) if f.page else '')+'.dat')
         if p!=expected or not 0<=f.page<400:raise ValueError('保存先が不正です。')
-    with ExitStack() as stack:
-        handles={};seen=set()
-        for name,expected in plan.dependencies:
-            p=Path(name).resolve()
-            if p in seen or not p.is_relative_to(root):raise ValueError('検証対象が不正です。')
-            seen.add(p)
-            handle=ExitStack();stack.enter_context(handle);handles[p]=handle
-            if digest(handle.enter_context(locked_read(p)))!=expected:raise ValueError('プレビュー後にファイルが変わりました。')
+    def validate(data):
         # Rebuild the domain proposal from the locked game data.
         fresh=load_snapshot(root);proposed=deepcopy(fresh)
         character=next(c for c in proposed.characters if c.folder_id==plan.character)
@@ -172,50 +167,9 @@ def execute_macro_save(plan,backup_root):
         character.macros=[replace(m,lines=tuple(Text(changes[(macro_key(m),n)].after,'','draft') if (macro_key(m),n) in changes else line for n,line in enumerate(m.lines,1))) for m in character.macros]
         verified=prepare_macro_save(fresh,proposed,plan.character)
         if verified.files!=plan.files or verified.dependencies!=plan.dependencies:raise ValueError('保存計画が現在のFix案と一致しません。')
-        folder=backup_root/uuid4().hex;folder.mkdir(parents=True,exist_ok=False)
-        receipt={'kind':'macro-storage-fix','character':plan.character,'files':[],'dependencies':dict(plan.dependencies)}
-        for i,f in enumerate(plan.files):
-            filename=f'{i:03}.original.dat'
-            with (folder/filename).open('xb') as stream:
-                stream.write(f.original);stream.flush();os.fsync(stream.fileno())
-            if (folder/filename).read_bytes()!=f.original:raise OSError('バックアップ検証に失敗しました。')
-            receipt['files'].append({'target':f.target,'backup':filename,'page':f.page,'before_sha256':digest(f.original),'after_sha256':digest(f.replacement),
-                                     'changes':[{'address':c.address,'line':c.line,'before':c.before,'after':c.after} for c in f.changes]})
-        write_json(folder/'receipt.json',receipt)
-        # Create every staged file before changing any target (permission/space preflight).
-        staged={}
-        try:
-            for f in plan.files:
-                p=Path(f.target);tmp=p.with_name('.ff11-macro-'+uuid4().hex+'.tmp');staged[p]=tmp
-                with tmp.open('xb') as stream:
-                    stream.write(f.replacement);stream.flush();os.fsync(stream.fileno())
-                if tmp.read_bytes()!=f.replacement:raise OSError('保存用一時ファイルの検証に失敗しました。')
-            require_game_closed()
-            attempted=[]
-            try:
-                for f in plan.files:
-                    p=Path(f.target);require_game_closed();handles[p].close()
-                    if p.read_bytes()!=f.original:raise ValueError('置換直前にマクロが変更されました。')
-                    attempted.append(f);os.replace(staged[p],p)
-                    if p.read_bytes()!=f.replacement:raise OSError('保存後の内容が一致しません。')
-                    macros(p.read_bytes(),f.page)
-            except Exception as error:
-                failed=[]
-                for f in reversed(attempted):
-                    try:
-                        require_game_closed()
-                        p=Path(f.target);current=p.read_bytes()
-                        if current==f.original:continue
-                        if current!=f.replacement:raise ValueError('保存後に別の変更を検出')
-                        atomic_replace(p,f.original)
-                        if p.read_bytes()!=f.original:raise OSError('復元後の内容が不一致')
-                    except Exception as rollback_error:failed.append(str(rollback_error))
-                write_json(folder/'failure.json',{'error':str(error),'rollback_errors':failed})
-                raise RuntimeError(f'保存を中止しました。復元確認: {"要確認" if failed else "完了"}。バックアップ: {folder}') from error
-            write_json(folder/'verified.json',{'files':len(plan.files),'status':'verified'})
-            return folder
-        finally:
-            for tmp in staged.values():tmp.unlink(missing_ok=True)
+    return execute_batch(plan,backup_root,root,validate,macros,'macro-storage-fix','.ff11-macro-',
+                         lambda c:{'address':c.address,'line':c.line,'before':c.before,'after':c.after},
+                         require_game_closed,write_json,atomic_replace)
 
 
 def restore_macro_backup(folder,apply=False):

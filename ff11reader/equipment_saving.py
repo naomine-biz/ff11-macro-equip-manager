@@ -10,7 +10,8 @@ from .codecs import BAGS, equipsets, inventory
 from .domain import Character
 from .fixes import plan_fixes
 from .saving import digest, patch_equipment, locked_read, atomic_replace, require_game_closed
-from .macro_saving import write_json
+from .file_transaction import execute_batch, write_json
+from .save_plan import DeferredChange, deferred_text, require_same_targets
 
 @dataclass(frozen=True)
 class EquipmentFile:
@@ -25,23 +26,29 @@ class EquipmentSavePlan:
     character: str
     files: tuple
     dependencies: tuple
-    deferred: int = 0
+    deferred_changes: tuple = ()
+
+    @property
+    def deferred(self):return len(self.deferred_changes)
 
 def prepare_equipment_save(saved, working, folder):
     original=next(c for c in saved.characters if c.folder_id==folder)
     edited=next(c for c in working.characters if c.folder_id==folder)
+    require_same_targets(original,edited)
     allowed={(x.equipset,x.slot):x for x in plan_fixes(original).changes}
-    old={e.number:e for e in original.equipsets};grouped={};deferred=0
+    old={e.number:e for e in original.equipsets};grouped={};deferred=[]
     for e in edited.equipsets:
-        before=old[e.number];deferred+=e.title.display!=before.title.display
+        before=old[e.number]
+        address=f'装備セット {e.number:03} {e.title.display}'
+        if e.title.display!=before.title.display:deferred.append(DeferredChange(address+' / 名前','装備セット名の保存は未対応です。'))
         for a,b in zip(before.slots,e.slots):
             values=lambda s:(s.name,s.action,s.item_id,s.container,s.index)
             if values(a)==values(b):continue
             change=allowed.get((e.number,a.name))
             if change is None or values(b)!=(a.name,a.action,a.item_id,*change.after):
-                deferred+=1;continue
+                deferred.append(DeferredChange(address+' / '+a.name,'現在の一意な参照位置補正と一致しません。枠の任意編集の保存は未対応です。'));continue
             grouped.setdefault((e.number-1)//20,[]).append(change)
-    if not grouped:raise ValueError('保存できる参照位置の補正がありません。先に補正案を作業データへ適用してください。')
+    if not grouped:raise ValueError('保存できる参照位置の補正がありません。先に補正案を作業データへ適用してください。'+('\n'+deferred_text(deferred) if deferred else ''))
     records={Path(s['path']).resolve():s for s in saved.sources}
     parents={p.parent for p in records if p.parent.name==folder and p.parent.parent.name.upper()=='USER'}
     if len(parents)!=1 or not re.fullmatch('[0-9a-fA-F]+',folder):raise ValueError('保存先を特定できません。')
@@ -63,7 +70,7 @@ def prepare_equipment_save(saved, working, folder):
         if any(x not in valid for x in changes):raise ValueError('補正候補が変わりました。再読み込みしてください。')
         target=parent/f'es{page}.dat';raw=data[target]
         files.append(EquipmentFile(str(target),page,raw,patch_equipment(raw,page,changes),tuple(changes)))
-    return EquipmentSavePlan(folder,tuple(files),tuple((str(p),digest(raw)) for p,raw in data.items()),deferred)
+    return EquipmentSavePlan(folder,tuple(files),tuple((str(p),digest(raw)) for p,raw in data.items()),tuple(deferred))
 
 def execute_equipment_save(plan,backup_root):
     require_game_closed()
@@ -82,13 +89,7 @@ def execute_equipment_save(plan,backup_root):
     required=targets|{parent/name for name in BAGS}
     if len(plan.dependencies)!=len(required) or {Path(p).resolve() for p,_ in plan.dependencies}!=required:
         raise ValueError('全保存対象と全収納の検証情報が必要です。')
-    with ExitStack() as stack:
-        handles={};data={}
-        for name,expected in plan.dependencies:
-            p=Path(name).resolve();handle=ExitStack();stack.enter_context(handle);handles[p]=handle
-            raw=handle.enter_context(locked_read(p))
-            if digest(raw)!=expected:raise ValueError('プレビュー後にファイルが変わりました。')
-            data[p]=raw
+    def validate(data):
         source=Character(plan.character)
         for f in plan.files:
             if data[Path(f.target).resolve()]!=f.original:raise ValueError('保存元が変わりました。')
@@ -97,46 +98,8 @@ def execute_equipment_save(plan,backup_root):
             source.inventory.extend(inventory(data[parent/name],bag));source.inventory_coverage[bag]='loaded'
         allowed=plan_fixes(source).changes
         if any(c not in allowed for f in plan.files for c in f.changes):raise ValueError('一意な補正条件を満たしていません。')
-        folder=backup_root/uuid4().hex;folder.mkdir(parents=True,exist_ok=False)
-        receipt={'kind':'equipment-reference-fix','character':plan.character,'files':[],'dependencies':dict(plan.dependencies)}
-        for i,f in enumerate(plan.files):
-            filename=f'{i:03}.original.dat'
-            with (folder/filename).open('xb') as stream:
-                stream.write(f.original);stream.flush();os.fsync(stream.fileno())
-            if (folder/filename).read_bytes()!=f.original:raise OSError('バックアップ検証に失敗しました。')
-            receipt['files'].append({'target':f.target,'backup':filename,'page':f.page,'before_sha256':digest(f.original),'after_sha256':digest(f.replacement),'changes':[asdict(c) for c in f.changes]})
-        write_json(folder/'receipt.json',receipt)
-        staged={}
-        try:
-            for f in plan.files:
-                p=Path(f.target);tmp=p.with_name('.ff11-equipment-'+uuid4().hex+'.tmp');staged[p]=tmp
-                with tmp.open('xb') as stream:
-                    stream.write(f.replacement);stream.flush();os.fsync(stream.fileno())
-                if tmp.read_bytes()!=f.replacement:raise OSError('一時ファイルの検証に失敗しました。')
-            attempted=[]
-            try:
-                for f in plan.files:
-                    p=Path(f.target);require_game_closed();handles[p.resolve()].close()
-                    if p.read_bytes()!=f.original:raise ValueError('置換直前に装備セットが変更されました。')
-                    attempted.append(f);os.replace(staged[p],p)
-                    if p.read_bytes()!=f.replacement:raise OSError('保存後の内容が一致しません。')
-                    equipsets(p.read_bytes(),f.page)
-            except Exception as error:
-                failed=[]
-                for f in reversed(attempted):
-                    try:
-                        require_game_closed();p=Path(f.target);current=p.read_bytes()
-                        if current==f.original:continue
-                        if current!=f.replacement:raise ValueError('保存後に別の変更を検出')
-                        atomic_replace(p,f.original)
-                        if p.read_bytes()!=f.original:raise OSError('復元後の内容が不一致')
-                    except Exception as rollback_error:failed.append(str(rollback_error))
-                write_json(folder/'failure.json',{'error':str(error),'rollback_errors':failed})
-                raise RuntimeError(f'保存を中止しました。復元確認: {"要確認" if failed else "完了"}。バックアップ: {folder}') from error
-            write_json(folder/'verified.json',{'files':len(plan.files),'status':'verified'})
-            return folder
-        finally:
-            for tmp in staged.values():tmp.unlink(missing_ok=True)
+    return execute_batch(plan,backup_root,root,validate,equipsets,'equipment-reference-fix','.ff11-equipment-',
+                         asdict,require_game_closed,write_json,atomic_replace)
 
 
 def restore_equipment_backup(folder,apply=False):

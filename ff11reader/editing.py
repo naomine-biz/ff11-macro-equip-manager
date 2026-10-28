@@ -2,6 +2,7 @@
 from copy import deepcopy
 from dataclasses import dataclass, replace
 from .domain import Text
+from .edit_values import value, character_value, snapshot_value, validate_transition, key as edit_key
 from .macro_inventory import assess_macro_inventory
 from .references import assess_equipment
 
@@ -27,8 +28,7 @@ def macro_key(macro):
 
 def contents(character):
     """Semantic edit contents, independent of binary encoding and derived states."""
-    return ([(macro_key(m), m.title.display, tuple(l.display for l in m.lines)) for m in character.macros],
-            [(e.number, e.title.display, tuple((s.name,s.action,s.item_id,s.container,s.index) for s in e.slots)) for e in character.equipsets])
+    return character_value(character)
 
 
 def edit_macro(character, macro, title, lines):
@@ -64,12 +64,16 @@ class EditSession:
 
     @property
     def dirty(self):
-        return any(contents(a) != contents(b) for a, b in zip(self.saved.characters, self.working.characters))
+        return snapshot_value(self.saved) != snapshot_value(self.working)
 
     def _apply(self, edit, reverse=False):
+        if not isinstance(edit,Edit) or not isinstance(edit.changes,tuple):raise ValueError('編集案の形式が不正です。')
+        snapshot_value(self.working)
         working = deepcopy(self.working)
         seen = set()
         for change in edit.changes:
+            if not isinstance(change,Change) or not isinstance(change.key,tuple) or not isinstance(change.character,str):raise ValueError('変更の形式が不正です。')
+            validate_transition(change.before,change.after,change.kind)
             identity = (change.character, change.kind, change.key)
             if identity in seen or change.kind not in ('macros', 'equipsets'):
                 raise ValueError('編集操作の対象が不正です。')
@@ -81,20 +85,26 @@ class EditSession:
             key = macro_key if change.kind == 'macros' else lambda e: (e.number,)
             index = next((i for i, v in enumerate(values) if key(v) == change.key), None)
             before, after = (change.after, change.before) if reverse else (change.before, change.after)
-            if index is None or values[index] != before or key(after) != change.key:
+            if index is None or value(values[index]) != value(before) or key(after) != change.key:
                 raise ValueError('作業データが変わりました。変更案を作り直してください。')
-            values[index] = after
+            if value(before)!=value(after):values[index] = deepcopy(after)
         for character in working.characters:
             sources = {s.container: s.item_reference.inventory_source for e in character.equipsets for s in e.slots if s.container is not None}
             character.equipsets = assess_equipment(character, sources)
         self.working = working
 
     def apply(self, edit):
-        edit = replace(edit, changes=tuple(c for c in edit.changes if c.before != c.after))
+        if not isinstance(edit,Edit) or not isinstance(edit.changes,tuple):raise ValueError('編集案の形式が不正です。')
+        for c in edit.changes:
+            if not isinstance(c,Change):raise ValueError('変更の形式が不正です。')
+            validate_transition(c.before,c.after,c.kind)
+            if not isinstance(c.key,tuple) or c.key!=edit_key(c.before) or not isinstance(c.character,str):raise ValueError('変更対象のキーが不正です。')
+        if len({(c.character,c.kind,c.key) for c in edit.changes})!=len(edit.changes):raise ValueError('変更対象が重複しています。')
+        self._apply(edit)
+        edit = replace(edit, changes=tuple(c for c in edit.changes if value(c.before) != value(c.after)))
         if not edit.changes:
             return
-        self._apply(edit)
-        self.history[self.cursor:] = [edit]
+        self.history[self.cursor:] = [deepcopy(edit)]
         self.cursor += 1
 
     def undo(self):
@@ -106,3 +116,11 @@ class EditSession:
         if self.cursor < len(self.history):
             self._apply(self.history[self.cursor])
             self.cursor += 1
+
+
+def plan_equipment_edit(character,plan):
+    from .fixes import apply_fixes
+    sources={s.container:s.item_reference.inventory_source for e in character.equipsets for s in e.slots if s.container is not None}
+    updated=apply_fixes(character,plan,sources)
+    changes=tuple(Change(character.folder_id,'equipsets',(a.number,),a,b) for a,b in zip(character.equipsets,updated.equipsets) if value(a)!=value(b))
+    return Edit('装備セットの参照Fix',changes)

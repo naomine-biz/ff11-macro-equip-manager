@@ -118,7 +118,9 @@ class EditingTests(unittest.TestCase):
     def test_fix_recomputed_and_no_game_save_dependency(self):
         with tempfile.TemporaryDirectory(dir=TEMP_ROOT) as tmp:
             s=snapshot();e=Editor(s,Path(tmp)/'draft.json');plan=plan_macro_fixes(s.characters[0],s.items)
-            e.session.working.characters[0].inventory.append(InventoryRow(8,4,100))
+            # Simulate changed input via a new read, not a mutation of the public view.
+            s.characters[0].inventory.append(InventoryRow(8,4,100))
+            e=Editor(s,Path(tmp)/'draft.json')
             with self.assertRaises(ValueError):e.macro_fixes('one',plan)
             self.assertEqual(e.session.cursor,0)
 
@@ -131,12 +133,13 @@ class EditingTests(unittest.TestCase):
     def test_equipment_and_macro_share_persistent_history(self):
         with tempfile.TemporaryDirectory(dir=TEMP_ROOT) as tmp:
             s=snapshot();c=s.characters[0]
-            c.equipsets=[Equipset(1,text('Set'),(Slot('body','equip',100,10,9,''),))]
+            from ff11reader.edit_values import SLOT_NAMES
+            c.equipsets=[Equipset(1,text('Set'),tuple(Slot(n,'equip',100,10,9,'') if n=='body' else Slot(n,'keep',None,None,None,'') for n in SLOT_NAMES))]
             c.equipsets=assess_equipment(c,{10:{'path':'inventory','sha256':'abc'}})
             path=Path(tmp)/'draft.json';e=Editor(s,path)
             e.equipment_fixes('one',plan_fixes(c))
             e.macro_fixes('one',plan_macro_fixes(e.session.working.characters[0],s.items))
             resumed=Editor(s,path);self.assertFalse(resumed.blocked)
-            resumed.undo();self.assertEqual(resumed.session.working.characters[0].equipsets[0].slots[0].index,3)
+            resumed.undo();self.assertEqual(resumed.session.working.characters[0].equipsets[0].slots[5].index,3)
             resumed.undo();self.assertFalse(resumed.session.dirty)
-            resumed.redo();self.assertEqual(resumed.session.working.characters[0].equipsets[0].slots[0].index,3)
+            resumed.redo();self.assertEqual(resumed.session.working.characters[0].equipsets[0].slots[5].index,3)
