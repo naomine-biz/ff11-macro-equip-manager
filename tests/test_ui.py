@@ -14,7 +14,7 @@ from ff11reader.presentation import present_slot
 from ff11reader.domain import ItemReferenceState
 
 
-@unittest.skipUnless(os.environ.get("FF11_RUN_INTEGRATION") == "1", "Set FF11_RUN_INTEGRATION=1 for installed-game UI checks")
+@unittest.skipUnless(os.environ.get("FF11_RUN_GAME_INTEGRATION") == "1", "Set FF11_RUN_GAME_INTEGRATION=1 for installed-game UI checks")
 class GraphicalWorkspaceTests(unittest.TestCase):
  def test_character_modes_slot_details_and_candidate_navigation(self):
   snapshot=load_snapshot(installations()[0]);errors=[]

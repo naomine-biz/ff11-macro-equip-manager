@@ -16,7 +16,9 @@ class FoundationTests(unittest.TestCase):
     def test_semantic_precondition_ignores_source_metadata(self):
         source=snapshot();c=source.characters[0];macro=c.macros[0]
         session=EditSession(source);edit=edit_macro(c,macro,'New',[x.display for x in macro.lines])
-        session.working.characters[0].macros[0]=replace(macro,title=replace(macro.title,raw_hex='different',state='resolved'))
+        working=session.working
+        working.characters[0].macros[0]=replace(macro,title=replace(macro.title,raw_hex='different',state='resolved'))
+        session.working=working
         self.assertFalse(session.dirty)
         session.apply(edit);session.undo();self.assertFalse(session.dirty)
         session.redo();self.assertTrue(session.dirty)
@@ -35,10 +37,13 @@ class FoundationTests(unittest.TestCase):
 
     def test_dirty_checks_missing_targets_and_character_keys(self):
         source=snapshot();session=EditSession(source)
-        session.working.characters[0].macros.clear();self.assertTrue(session.dirty)
-        session=EditSession(source);session.working.characters.clear();self.assertTrue(session.dirty)
-        session=EditSession(source);session.working.characters.append(deepcopy(session.working.characters[0]))
-        with self.assertRaises(ValueError):_ = session.dirty
+        working=session.working;working.characters[0].macros.clear();session.working=working
+        self.assertTrue(session.dirty)
+        session=EditSession(source);working=session.working;working.characters.clear();session.working=working
+        self.assertTrue(session.dirty)
+        session=EditSession(source);working=session.working;working.characters.append(deepcopy(working.characters[0]))
+        with self.assertRaises(ValueError):session.working=working
+        self.assertFalse(session.dirty)
 
     def test_read_views_and_preview_are_detached(self):
         with tempfile.TemporaryDirectory(dir=TEMP_ROOT) as tmp:

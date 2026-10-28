@@ -52,9 +52,11 @@ class WardrobeUsageTests(unittest.TestCase):
     def test_edit_and_undo_recompute_without_cross_character_references(self):
         s=snapshot('/equip body Robe 2');session=EditSession(s);c=session.working.characters[0];m=c.macros[0]
         session.apply(edit_macro(c,m,m.title.display,['/echo hi','','','','','']))
-        self.assertEqual(inspect_wardrobe_usage(session.working,session.working.characters[0])[0].state,'unreferenced')
+        working=session.working
+        self.assertEqual(inspect_wardrobe_usage(working,working.characters[0])[0].state,'unreferenced')
         session.undo()
-        self.assertEqual(inspect_wardrobe_usage(session.working,session.working.characters[0])[0].state,'referenced')
+        working=session.working
+        self.assertEqual(inspect_wardrobe_usage(working,working.characters[0])[0].state,'referenced')
         with self.assertRaises(ValueError):inspect_wardrobe_usage(s,replace(c,folder_id='other'))
 
     @unittest.skipUnless(os.environ.get('FF11_RUN_INTEGRATION')=='1','Enable Tk checks')

@@ -11,22 +11,41 @@ FF11のローカルファイルを扱うWindowsデスクトップアプリ。
 Python 3.12とTkinterを使用します。リポジトリ直下で実行します。
 
 ```powershell
-python reader.py
+python -m venv .venv
+.venv\Scripts\python -m pip install -r requirements.txt
+.venv\Scripts\python reader.py
 ```
 
 インストール先を指定する場合:
 
 ```powershell
-python reader.py --root "C:\path\to\FINAL FANTASY XI"
+.venv\Scripts\python reader.py --root "C:\path\to\FINAL FANTASY XI"
 ```
 
 ## テスト
 
 ```powershell
-python -m unittest discover -s tests -v
+.venv\Scripts\python -m unittest discover -s tests -v
 ```
 
-通常は合成データを使います。インストール済みFF11を読み取る統合テストは明示的な有効化が必要です。実機検証の取扱いは[SAFE-001](requirements.md#safe-001)に従います。
+通常は合成データを使います。インストール済みFF11を読み取る統合テストは明示的な有効化が必要です。`FF11_RUN_INTEGRATION=1` は合成GUIテストを有効にします。実ゲームを読むUIテストは別途 `FF11_RUN_GAME_INTEGRATION=1` が必要です。実機検証の取扱いは[SAFE-001](requirements.md#safe-001)に従います。
+
+## Property Test
+
+編集・保存の生成テストだけを実行する場合:
+
+```powershell
+$env:FF11_RUN_INTEGRATION = "0"
+.venv\Scripts\python -B -m unittest tests.test_editing_properties tests.test_saving_properties tests.test_property_support -q
+```
+
+seedを指定して再現する場合は、実行前に設定します。
+
+```powershell
+$env:FF11_PROPERTY_SEEDS = "42"
+```
+
+既定seedに戻す場合は `Remove-Item Env:FF11_PROPERTY_SEEDS` を実行します。失敗した操作列の縮小結果は `work/property-tests/` に保存されます。検証範囲は[対応表](docs/requirements-traceability.md)を参照してください。
 
 ## データ
 

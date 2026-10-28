@@ -1,5 +1,6 @@
 """Graphical workspace with explicit, guarded equipment reference saving."""
 from collections import Counter
+from contextlib import contextmanager
 from datetime import datetime
 import tkinter as tk
 from tkinter import ttk, simpledialog, messagebox
@@ -11,6 +12,26 @@ from .editing import plan_macro_fixes, macro_key
 from .macro_inventory import assess_macro_inventory, LABELS as MACRO_ITEM_LABELS
 from .application import inspect_macro_set_links, inspect_wardrobe_usage
 from pathlib import Path
+from .tracing import configure, traced
+
+
+@contextmanager
+def waiting_cursor(root):
+ """Keep temporary busy feedback in the UI; preserve each widget's cursor."""
+ cursors=[]
+ def visit(widget):
+  if 'cursor' in widget.keys():
+   cursors.append((widget,widget.cget('cursor')))
+   widget.configure(cursor='wait')
+  for child in widget.winfo_children():visit(child)
+ try:
+  visit(root)
+  root.update_idletasks()
+  yield
+ finally:
+  for widget,cursor in reversed(cursors):
+   if widget.winfo_exists():widget.configure(cursor=cursor)
+  root.update_idletasks()
 
 
 ACTION_STYLE = {
@@ -167,20 +188,22 @@ class ReaderWindow:
   if not plan.changes:text.insert('end','適用できるFix案はありません。')
   text.configure(state='disabled')
   def apply():
-   try:self.editor.equipment_fixes(c.folder_id,plan)
+   try:self.run_edit(lambda:self.editor.equipment_fixes(c.folder_id,plan))
    except (ValueError,OSError) as e:messagebox.showerror('適用できません',str(e),parent=window);return
-   window.destroy();self.refresh_edits()
+   window.destroy()
    self.footer.configure(text=f'アプリ内の作業データに {len(plan.changes)}枠のFixを適用しました。')
   ttk.Button(window,text='この案をアプリ内に適用（ゲームへの保存なし）',command=apply,state='normal' if plan.changes else 'disabled').pack(side='right',padx=12,pady=12)
   ttk.Button(window,text='閉じる',command=window.destroy).pack(side='right',pady=12)
+ @traced('ui.update_edit_status')
  def update_edit_status(self):
   cursor,history_length,dirty=self.editor.edit_status()
   self.undo_button.configure(state='normal' if cursor and not self.editor.blocked else 'disabled')
   self.redo_button.configure(state='normal' if cursor<history_length and not self.editor.blocked else 'disabled')
   self.draft_label.configure(text='作業再開の確認が必要' if self.editor.blocked else f'編集中 {cursor}操作 · '+('変更あり' if dirty else '保存済み状態'))
+ @traced('ui.refresh_edits')
  def refresh_edits(self):
   selected=self.selected;address=self.active_macro
-  self.snapshot=self.editor.snapshot()
+  self.snapshot=self.editor.snapshot(self.snapshot)
   self.change_mode()
   if self.mode.get()=='マクロ' and address:
    item=f'palette-{address[0]}-{address[1]}'
@@ -190,19 +213,21 @@ class ReaderWindow:
    index=next((i for i,e in enumerate(self.navigation) if e.number==selected.number),0)
    self.nav.selection_clear(0,'end');self.nav.selection_set(index);self.nav.see(index);self.select_navigation()
   self.update_edit_status()
+ @traced('ui.run_edit')
+ def run_edit(self,operation):
+  with waiting_cursor(self.app):
+   operation()
+   self.refresh_edits()
  def undo_fix(self):
-  try:self.editor.undo()
+  try:self.run_edit(self.editor.undo)
   except (OSError,ValueError) as e:messagebox.showerror('Undo',str(e),parent=self.app);return
-  self.refresh_edits()
  def redo_edit(self):
-  try:self.editor.redo()
+  try:self.run_edit(self.editor.redo)
   except (OSError,ValueError) as e:messagebox.showerror('Redo',str(e),parent=self.app);return
-  self.refresh_edits()
  def reset_edits(self):
   if not messagebox.askyesno('編集をリセット','現在の作業ファイルを保管し、読込時の状態から編集を開始しますか？',parent=self.app):return
-  try:self.editor.start_fresh()
+  try:self.run_edit(self.editor.start_fresh)
   except (OSError,ValueError) as e:messagebox.showerror('リセット',str(e),parent=self.app);return
-  self.refresh_edits()
  def preview_game_save(self):
   if not self.character:return
   try:plan=self.editor.prepare_macro_save(self.character.folder_id)
@@ -255,6 +280,7 @@ class ReaderWindow:
    window.destroy();self.refresh_edits();self.footer.configure(text=f'{count}枠を保存・検証しました。バックアップ: {backup}')
   button=ttk.Button(window,text=f'バックアップして{count}枠をゲームに保存',command=save);button.pack(pady=12)
  def change_character(self,event=None):self.change_mode()
+ @traced('ui.change_mode')
  def change_mode(self):
   if not self.character:return
   self.active_macro=None;self.edit_button.configure(state='disabled')
@@ -472,11 +498,10 @@ class ReaderWindow:
   if not count:text.insert('end','変更対象なし')
   text.configure(state='disabled')
   def commit():
-   try:apply()
+   try:self.run_edit(apply)
    except (ValueError,OSError) as e:messagebox.showerror('作業保存',str(e),parent=window);return
    window.destroy()
    if parent and parent.winfo_exists():parent.destroy()
-   self.refresh_edits()
   ttk.Button(window,text=f'{count}マクロの変更を作業データに適用',command=commit,state='normal' if count and not self.editor.blocked else 'disabled').pack(pady=12)
  def show_macro_inventory(self):
   c=self.character
@@ -631,4 +656,5 @@ class ReaderWindow:
 
 
 def show(snapshot):
+ configure(Path(__file__).resolve().parent.parent / 'work' / 'logs' / 'timings.jsonl')
  app=tk.Tk();app.view=ReaderWindow(app,snapshot);app.mainloop()
