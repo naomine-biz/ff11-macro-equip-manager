@@ -1,5 +1,5 @@
 """Single-file equipment reference writer. Backups are outside the installation."""
-from contextlib import contextmanager, ExitStack
+from contextlib import contextmanager
 from dataclasses import dataclass, asdict
 from pathlib import Path
 import ctypes
@@ -171,50 +171,34 @@ def execute_save(plan, backup_root):
     expected_paths = {str(target)} | {str(target.parent / name) for name in BAGS}
     if len(plan.dependencies) != 18 or {p for p, _ in plan.dependencies} != expected_paths:
         raise ValueError('全収納の検証情報が必要です。')
-    with ExitStack() as stack:
-        target_lock = ExitStack()
-        stack.enter_context(target_lock)
-        current_data = {}
-        for name, expected in plan.dependencies:
-            path = Path(name)
-            raw = (target_lock if path == target else stack).enter_context(locked_read(path))
-            if digest(raw) != expected:
-                raise ValueError('プレビュー後にファイルが変わりました。再読み込みしてください。')
-            current_data[path] = raw
+    from types import SimpleNamespace
+    from .file_transaction import execute_batch, write_json
+
+    def validate(data):
         source = Character(target.parent.name)
-        source.equipsets = equipsets(current_data[target], int(target.name[2]))
+        source.equipsets = equipsets(data[target], int(target.name[2]))
         for name, bag in BAGS.items():
-            source.inventory.extend(inventory(current_data[target.parent / name], bag))
+            source.inventory.extend(inventory(data[target.parent / name], bag))
             source.inventory_coverage[bag] = 'loaded'
         allowed = plan_fixes(source).changes
         if not plan.changes or any(change not in allowed for change in plan.changes):
             raise ValueError('自動補正の条件を満たさない変更です。')
-        if target.read_bytes() != plan.original:
-            raise ValueError('保存元が変わりました。')
-        folder = backup_root / uuid4().hex
-        folder.mkdir(parents=True, exist_ok=False)
-        with (folder / 'original.dat').open('xb') as stream:
-            stream.write(plan.original); stream.flush(); os.fsync(stream.fileno())
-        if (folder / 'original.dat').read_bytes() != plan.original:
-            raise OSError('バックアップ検証失敗。保存しません。')
-        receipt = {'target': str(target), 'before_sha256': digest(plan.original),
-                   'after_sha256': digest(plan.replacement),
-                   'changes': [asdict(x) for x in plan.changes],
-                   'dependencies': dict(plan.dependencies)}
-        with (folder / 'receipt.json').open('x', encoding='utf-8') as stream:
-            json.dump(receipt, stream, ensure_ascii=False, indent=2)
-            stream.flush(); os.fsync(stream.fileno())
-        require_game_closed()
-        # Windows replacement requires releasing the old target handle. Inventory
-        # stays locked; verify target once more in the narrow replacement window.
-        target_lock.close()
-        if target.read_bytes() != plan.original:
-            raise ValueError('置換直前に保存元が変わりました。')
-        atomic_replace(target, plan.replacement)
-        if target.read_bytes() != plan.replacement:
-            raise OSError(f'書込後検証失敗。ゲームを起動せずバックアップを確認: {folder}')
-        equipsets(target.read_bytes(), int(target.name[2]))
-        return folder
+
+    file = SimpleNamespace(target=str(target), page=int(target.name[2]),
+                           original=plan.original, replacement=plan.replacement,
+                           changes=plan.changes)
+    batch = SimpleNamespace(character=target.parent.name, files=(file,),
+                            dependencies=plan.dependencies)
+    try:
+        return execute_batch(batch, backup_root, game_root, validate, equipsets,
+                             'equipment-reference-fix', '.ff11-fix-', asdict,
+                             require_game_closed, write_json, atomic_replace,
+                             single_file_receipt=True)
+    except RuntimeError as exc:
+        # Preserve the CLI's I/O error category together with rollback details.
+        if isinstance(exc.__cause__, OSError):
+            raise OSError(str(exc)) from exc
+        raise
 
 
 def restore_backup(folder):

@@ -2,6 +2,7 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from .domain import InventoryRow
+from .inventory_observation import InventoryObservation
 from .macro_inventory import parse_equip, STORAGES
 
 WARDROBES = frozenset(STORAGES[n] for n in range(1,9))
@@ -16,11 +17,11 @@ class WardrobeUsage:
 
 def inspect_wardrobes(character, items, incomplete=False):
     rows=character.inventory
-    by_type=defaultdict(list);by_name=defaultdict(list);positions=defaultdict(list)
+    observation=InventoryObservation(character)
+    by_type=observation.by_type;by_name=defaultdict(list)
     direct=defaultdict(list);possible=defaultdict(list)
     def key(row):return row.container,row.index,row.item_id
     for row in rows:
-        by_type[row.item_id].append(row);positions[row.container,row.index].append(row)
         name=items.get(row.item_id,{}).get('name')
         if name:by_name[name].append(row)
     for equipset in character.equipsets:
@@ -31,7 +32,7 @@ def inspect_wardrobes(character, items, incomplete=False):
             candidates=by_type[slot.item_id]
             exact=[r for r in candidates if (r.container,r.index)==(slot.container,slot.index)]
             label=f'装備セット {equipset.number:03} {equipset.title.display} / {slot.name}'
-            if len(exact)==1 and len(positions[slot.container,slot.index])==1:
+            if len(exact)==1 and observation.sound(exact[0]):
                 direct[key(exact[0])].append(label)
             else:
                 for row in candidates:possible[key(row)].append(label+'（保存位置違いの候補）')
@@ -46,7 +47,7 @@ def inspect_wardrobes(character, items, incomplete=False):
             candidates=by_name[command.item_name]
             selected=[r for r in candidates if r.container==STORAGES.get(command.storage)] if command.storage is not None else candidates
             label=f'ブック {macro.book:02} / パレット {macro.palette} / {macro.bank.upper()} {macro.key if macro.key<10 else 0} {macro.title.display} / {number}行目'
-            if command.valid and len(selected)==1:
+            if command.valid and len(selected)==1 and observation.sound(selected[0]):
                 direct[key(selected[0])].append(label)
             else:
                 for row in selected or candidates:possible[key(row)].append(label+'（参照先の候補）')
@@ -54,10 +55,11 @@ def inspect_wardrobes(character, items, incomplete=False):
     for row in sorted(rows,key=lambda r:(r.container,r.index)):
         if row.container not in WARDROBES:continue
         identity=key(row)
-        if direct[identity]:state='referenced';refs=direct[identity]+possible[identity]
+        if not observation.sound(row):
+            state='incomplete';refs=['収納の読込状態・内部位置・重複を確認してください。']
+        elif direct[identity]:state='referenced';refs=direct[identity]+possible[identity]
         elif possible[identity]:state='possible';refs=possible[identity]
-        elif (incomplete or character.inventory_coverage.get(row.container)!='loaded' or
-              not items.get(row.item_id,{}).get('name') or not 1<=row.index<=80 or len(positions[row.container,row.index])!=1):
+        elif incomplete or not items.get(row.item_id,{}).get('name'):
             state='incomplete';refs=['読み取れないデータや参照先を特定できない情報があるため、未参照か判断できません。']
         else:state='unreferenced';refs=[]
         result.append(WardrobeUsage(row,state,tuple(refs)))

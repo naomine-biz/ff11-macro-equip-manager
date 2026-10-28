@@ -57,3 +57,92 @@
 - [Property Test仕様](../tests/specs/property-tests.md): 35項目。生成条件と不変条件。
 
 上表の既存テストとの対応と、新しい検証仕様の実装状況は別に扱う。本整理ではテストを追加・実行していない。
+
+## 現行実装との差分監査（2026-10-28）
+
+対象: コミット375051eの要件・設計制約・Example Test 84ケース・Property Test 35項目と、現行コード・既存テスト102メソッド。
+方法: ソースとテストの静的確認、メモリ上で構築した合成値による純粋関数の確認。テストモジュールのimport、テストスイート、GUI、インストール先の検出・読込・保存は実行していない。以下は差分記録であり、要求の追加や実装変更を行うものではない。
+
+### A. 現在の機能で確認した差（GAP-01〜05は下記の修正結果を参照）
+
+| ID | 根拠 | 現行の結果・確認箇所 | 必要な変更 | 追加・変更する検証 |
+|---|---|---|---|---|
+| GAP-01 | MAC-002、PT-09 | [macro_inventory.py](../ff11reader/macro_inventory.py)のassess_macro_inventoryは全収納のcompleteを明示収納の一致より先に確認する。`/equip body Robe 1`、B8に一個、B1未読込でincompleteとなる。合成値で確認 | 指定収納の有効な一意参照は、その収納の資料から判定する。全収納の完全性は移動先・番号追加の一意Fixで要求する | [test_editing.py](../tests/test_editing.py)のstate_matrix等へ「指定先正常・他収納欠落」「指定先重複」を追加。指定なしの場合の保留は維持 |
+| GAP-02 | EQ-004、D-01/D-02、EX-E08〜10、PT-04/05 | [references.py](../ff11reader/references.py)、[fixes.py](../ff11reader/fixes.py)、[presentation.py](../ff11reader/presentation.py)で判定が分かれる。数量2の一候補はSlotがsame_type_elsewhere、Fix側はquantity_not_one。未読込収納に行が残る入力ではSlotがinsufficient_dataなのにFix側のissuesは空。合成値で確認 | ドメインで候補・Fix可否・保留理由を整合させ、Slotの評価を表示とFixで共有する。一致判定でも収納の読込状態・位置の妥当性を同じ基準で確認する | [test_slot_state.py](../tests/test_slot_state.py)、[test_fixes.py](../tests/test_fixes.py)、[test_presentation.py](../tests/test_presentation.py)へ同一入力に対する評価・理由・案の整合性を追加。未知・不完全入力を生成する |
+| GAP-03 | DATA-004、WARD-001、D-01、PT-30 | [wardrobe_usage.py](../ff11reader/wardrobe_usage.py)はdirectを重複位置・読込状態の検査より優先。B8,11にRobeとOtherの2行、マクロはRobe 1で、マクロ判定はincomplete、使用状況はRobeをreferencedとする。合成値で確認 | 確定参照を出す前に対象位置の有効性を確認する。参照あり・候補・保留の判定をドメインの観測条件とそろえる | [test_wardrobe_usage.py](../tests/test_wardrobe_usage.py)へ明示参照と重複位置・無効位置・未読込の組合せを追加。確定未参照へ落とさないことも確認 |
+| GAP-04 | D-02、PT-02 | [fixes.py](../ff11reader/fixes.py)のfingerprintはセット列挙順とraw_hexを含む。値を変えずセット順を反転するとapply_fixesが古い案として拒否。合成値で確認 | Fixの意味上の前提を対象キー順に正規化し、原本メタデータと分ける。保存時の原本ハッシュ照合は維持する | [test_fixes.py](../tests/test_fixes.py)へ順序置換・未編集raw差の不変性を追加。候補値変更による拒否の既存テストを維持 |
+| GAP-05 | D-05、SAVE-003〜005 | GUIは[file_transaction.py](../ff11reader/file_transaction.py)のexecute_batchを使うが、[application.py](../ff11reader/application.py)のsave_game_plan→[saving.py](../ff11reader/saving.py)のexecute_saveは独自のバックアップ・置換経路を持つ。静的確認 | 旧CLIの保存も共通実行処理へ接続する。既存CLIの入出力・バックアップ互換性を確認して移行する | [test_saving.py](../tests/test_saving.py)の既存ケースを維持し、置換後の検証失敗・復旧を追加。[test_edit_foundation.py](../tests/test_edit_foundation.py)の依存境界テストをCLI経路まで拡張 |
+
+GAP-02の未読込収納に行が残る入力は、現行デコーダーで発生した実データの報告ではない。生成仕様が許容する不完全入力に対する整合性の差として扱う。
+
+### B. 機能拡張前に整理する設計差
+
+| ID | 根拠 | 現行 | 必要な整理・検証 |
+|---|---|---|---|
+| DESIGN-01 | DATA-002、D-02/D-04、PT-07/24 | [domain.py](../ff11reader/domain.py)のTextはdisplay/raw_hex/state。[edit_values.py](../ff11reader/edit_values.py)と[editing.py](../ff11reader/editing.py)はdisplayで同一性を比較する | 任意マクロ保存前に定型文IDと表示文字の区別を値の構造へ反映する。原本メタデータ差を無視する既存テストは維持し、「同表示・異なるトークンID」「同ID・辞書表示変更」「未変更未知トークン保持」を別途検証する。現在のraw差だけの合成例はトークン衝突の実証ではない |
+| DESIGN-02 | D-04、SAVE-001/004 | [macro_saving.py](../ff11reader/macro_saving.py)と[equipment_saving.py](../ff11reader/equipment_saving.py)のprepare処理に差分抽出・対応範囲判定・ファイル読込・変換がまとまっている | 任意編集の保存を増やす際に、意味上の差分・保留と形式処理の境界を明示する。新しいクラス構成を必須とはしない。持ち物を使わない名前変更にFix専用の完全性条件を広げない |
+| DESIGN-03 | FUT-001、D-04、PT-32 | Change/Editによる一括適用はあるが、保存案はファイル別のFix群。参照依存グループの保存情報はない | 移動実装時にグループ全体の適用・Undo・保留・保存を表現する。現行の独立Fixの部分保存を廃止する変更は不要 |
+
+### C. テスト仕様との不一致・前提を確定する箇所
+
+| ID | 根拠 | 差 | 対応 |
+|---|---|---|---|
+| SPEC-01 | LINK-001/002、PT-08 | [macro_links.py](../ff11reader/macro_links.py)は`not is_empty`を既知の非空と同じに扱い、未知動作や16枠未満のセットも参照なし一覧へ入れる。未知一枠の合成セットで確認。既存test_remove_and_unknown_are_not_emptyは「空でない」しか検証しない | PT-08の「既知の非空だけ」を満たす空・非空・不明の区別が必要。removeは既知の非空を維持する。未知・欠落枠を含むセットの逆参照通知を要件で明記してからコードとテストをそろえる |
+| SPEC-02 | EDIT-005、EX-B11、PT-18 | [edit_application.py](../ff11reader/edit_application.py)のstart_freshは現在のsavedから開始し、ファイルを再読込しない。[ui.py](../ff11reader/ui.py)のリセットも同じ。起動時に新Snapshotを渡してからリセットする経路はある | 「再起動して最新Snapshotを取得→古い作業保管→再開」と「起動中に最新を再読込」を分ける。現行リセットを押すだけで最新取得できるという期待にはしない。まず前者の受入テストを追加し、後者の必要性を要件で確定する |
+| SPEC-03 | SAFE-001、PT-35 | Property仕様は全操作について保存要求前のゲーム側書込イベント0を要求する。共通条件だけでは、ゲーム側を意図的に外部更新する障害注入まで違反として数え得る | アプリ自身の書込イベントと、テスト用の外部更新・初期データ構築を区別して観測する。保存時の一時ファイルと原本置換も別イベントにする |
+| SPEC-04 | DATA-001、FUT-001〜003、PT-01/32〜34 | 複数インストールを含む生成、コピー先衝突、検索範囲などに未決定事項が残る。現行の単一インストール内のキャラ分離テストだけでは全範囲を証明できない | 現行対応範囲の生成器と将来機能の生成器を分ける。未決定の期待値を現行コードから補完しない |
+
+### D. 既存テストへ追加する検証
+
+既存102メソッドは主に固定例によるunittest。小さな入力表・ループ検証はあるが、PT仕様の生成器、操作列モデル、失敗例の縮小・seed再現を担う共通基盤はない。35項目のPropertyがすべて未検証という意味ではなく、現在の具体例では満たす範囲が限定される。
+
+| ID | 対象仕様 | 現状の検証 | 不足する検証 |
+|---|---|---|---|
+| TEST-01 | PT-01〜12、PT-30/31 | 参照・Fix・使用状況の固定例、全17収納を回すFix例、キャラ分離例 | 候補0/1/複数、読込状態、重複位置、行順の組合せ生成。評価の整合性、前方/逆参照集合の一致。GAP-01〜04の反例を固定テストにも追加 |
+| TEST-02 | EX-B02/03、PT-13 | test_invalid_batch_is_atomic_even_through_generic_applyの案は同一対象を2件含み、重複拒否で先に止まる場合がある | 異なる二対象のうち一件だけを不正にするケースを追加し、不正値・古い前提・欠落対象それぞれの拒否と全体不変を独立に検証する |
+| TEST-03 | PT-14〜18、PT-27 | 固定のUndo/Redo、分岐、作業保存失敗、再開、保存後Undo | 独立した値辞書と履歴カーソルの参照モデルを用意し、任意操作列で各段階を照合。無変更操作後のRedo維持、失敗したUndo/Redo、外部更新後の再開も含める |
+| TEST-04 | EX-S06/07、PT-22/25/26 | 2ファイル保存、特定の置換・準備・復元失敗、作業同期失敗の具体例 | 3ファイル以上、全バックアップ・全一時ファイルの各失敗地点、各置換/検証前後、強制中断相当の再開を生成。最初の置換より前に全準備が完了したことをイベント列で検証 |
+| TEST-05 | PT-23/24 | 固定オフセット41の変更と未知バイト保持、既知トークンの内部ゼロ、60バイト超過などの具体例 | 各部位・行・ページの先頭/末尾、上限直前/同値/超過、変換不能、未知トークンの組合せ。固定形式の独立オラクルを拡張し、本体エンコーダー/デコーダー同士の一致だけに依存しない |
+| TEST-06 | D-01/D-05、PT-35 | test_dependency_boundariesは一部モジュールの直接importとGUI/2保存モジュールを検査 | macro_inventory、macro_links、wardrobe_usage等と旧CLI経路を対象に加える。テスト用I/Oの許可ルート・ネットワーク・レジストリ・メモリ読込の拒否を共通化 |
+| TEST-07 | EX-U01〜05、PT-28/29 | 合成GUIの編集・保存例と実ゲーム依存のtest_ui | アコーディオン、空行減光、選択と詳細の対応、Fix限定一覧、ホバー/クリック反復を合成データで検証。視認性の判定基準と検証手段を定める |
+| TEST-08 | SAFE-001、検証仕様の共通条件 | 合成GUIテストと実ゲームを読むtest_uiが同じFF11_RUN_INTEGRATIONフラグを使う | 合成GUIと実ゲーム統合を別の明示フラグまたは別実行対象に分ける。合成GUIの一括実行で実ゲーム読込が有効にならない構成にする |
+| TEST-09 | 全Example/Property | 対応表は要件と代表テストを結ぶが、EX/PT IDごとの実装状況は未記録 | 既存テストを利用できる範囲、追加ケース、将来機能で未着手の範囲をEX/PT IDへ対応付ける。メソッド数と仕様ケース数を合否判定に使わない |
+
+### E. 合意済みの将来機能との差
+
+| 要件・仕様 | 現状 | 後続で必要な実装 |
+|---|---|---|
+| SAVE-001、EX-S15 | 現保存対象は収納番号Fix・装備位置Fix。任意編集は保留 | マクロ名・6行の形式変換と保存。DESIGN-01/02を先に扱う |
+| EDIT-006、EX-B12、PT-19 | 汎用Changeで枠の値を扱えるが、個別編集・候補手動選択のUIと一般保存はない | 名前・keep/remove/equip・手動選択の編集と保存 |
+| FUT-001/002、EX-F01〜04、PT-32/33 | 移動・カスケード・キャラ間コピー未実装 | 衝突規則、依存更新、一括保存、コピー先の再評価 |
+| DATA-001、EX-D02 | キャラの表示名登録とフォルダ切替はあるが、アカウント別整理は未実装 | アカウント識別と整理の仕様確定・実装 |
+| FUT-003、EX-F05/06、PT-34 | /equipの名前照合はある。汎用の名前/ID検索・誤記検出は未実装 | 検索対象、辞書未解決と未所持の区別、誤記候補規則 |
+| EDIT-005 | 古い作業の保管・起動時再読込は可能。選択的引継ぎ未実装 | 競合時の引継ぎ規則と操作 |
+| DATA-003 | オーグメント取得不可 | 保留を継続。今回の修正対象へ含めない |
+
+### 対応順
+
+1. GAP-01〜03の参照判定と使用状況の不整合を固定反例で検証し、ドメインへ集約する。
+2. GAP-04の意味上の前提、GAP-05の共通書込み経路をそろえる。TEST-02/06/08を併せて補う。
+3. TEST-01/03/04/05の生成・状態機械・障害注入を追加し、既存Fixの条件を広げず検証範囲を増やす。
+4. SPEC項目を確定したうえでDESIGN項目と将来機能へ進む。
+
+差分監査時は本対応表のみを更新した。その後のGAP-01〜05の修正結果を以下に記録する。
+
+### GAP-01〜05の修正結果（2026-10-28）
+
+5件の反例を先にテストへ追加し、修正前に失敗することを確認した。正本とテスト仕様の期待値は維持した。
+
+| 差分 | 修正 | 回帰テスト |
+|---|---|---|
+| GAP-01 | 明示収納の一意参照をその収納の資料で判定。全収納の完全性は番号追加・変更案で要求 | [test_reference_regressions.py](../tests/test_reference_regressions.py): test_explicit_storage_match_is_local、test_unrelated_invalid_candidate_does_not_hide_explicit_match（MAC-002、PT-09） |
+| GAP-02 | ItemReferenceへreason/fix_targetを追加。assess_equipmentが評価し、Fix計画と表示が利用 | 同ファイル: test_slot_and_plan_share_blocking_reason、test_slot_owns_unique_target_and_exact_match_priority（EQ-004、D-01、EX-E08〜10、PT-03〜06） |
+| GAP-03 | [inventory_observation.py](../ff11reader/inventory_observation.py)で収納読込・有効位置・重複検査を共有。使用状況は不正観測を先に保留 | 同ファイル: test_usage_never_confirms_invalid_observation（WARD-001、PT-30） |
+| GAP-04 | Fix指紋をキー順の意味上の値で構築し、raw_hexを除外。変更案と保留一覧の順序も固定 | 同ファイル: test_fix_preview_ignores_order_and_raw_metadata（D-02、PT-02）。候補変更時の拒否も検証 |
+| GAP-05 | 旧CLIのexecute_saveもexecute_batchへ委譲。original.datと旧receipt形式を維持し、検証失敗の復元・外部更新保護を共通化 | [test_saving.py](../tests/test_saving.py): test_legacy_save_delegates_to_shared_transaction、test_post_write_decode_failure_rolls_back_legacy_save、test_legacy_rollback_preserves_external_update（D-05、SAVE-003〜005） |
+
+旧作業ファイルのItemReferenceに新フィールドがない場合の読込・再評価はtest_old_draft_assessment_can_be_recomputedで確認。依存境界テストは新しい観測モジュール、参照クエリ群、旧CLIの共通保存呼出しまで拡張した。
+
+検証: `FF11_RUN_INTEGRATION=0`、`python -B -m unittest discover -s tests -q`。112件中106件成功、GUI関連6件スキップ。保存・復旧は一時ディレクトリの合成ファイルのみ。ゲームデータの検出・読込・書込、実機GUI検証は行っていない。
+
+B〜Eの将来機能、仕様の明確化、Property Testの生成基盤は未着手。TEST-06の直接依存検査とCLI経路の検査は拡張済みで、全I/O隔離の共通基盤とGUIフラグ分離は引き続き未対応。

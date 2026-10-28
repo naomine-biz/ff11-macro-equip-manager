@@ -1,6 +1,7 @@
 """Pure /equip parsing, inventory assessment and storage-number proposals."""
 from dataclasses import dataclass
 import re
+from .inventory_observation import InventoryObservation
 
 STORAGES = {0: 0, 1: 8, **{n: n + 8 for n in range(2, 9)}}
 SLOTS = set('main sub range ranged ammo head neck ear1 ear2 l.ear r.ear body hands ring1 ring2 l.ring r.ring back waist legs feet メイン サブ 遠隔 矢弾 頭 首 左耳 右耳 胴 両手 左指 右指 背 腰 両脚 両足'.split())
@@ -62,7 +63,8 @@ def parse_equip(line):
 
 def assess_macro_inventory(character, items):
     result = []
-    complete = all(character.inventory_coverage.get(n) == 'loaded' for n in range(17))
+    observation = InventoryObservation(character)
+    complete = observation.complete
     for macro in character.macros:
         for number, line in enumerate(macro.lines, 1):
             command = parse_equip(line.display)
@@ -75,14 +77,17 @@ def assess_macro_inventory(character, items):
                 rows = [r for r in character.inventory if items.get(r.item_id, {}).get('name') == command.item_name]
                 candidates = tuple((r.container, r.index, r.item_id) for r in rows)
                 chosen = [r for r in rows if r.container == STORAGES.get(command.storage)] if command.storage is not None else []
-                # Duplicate observations and invalid positions cannot justify a unique Fix.
-                sound = all(1 <= r.index <= 80 and sum(x.container == r.container and x.index == r.index for x in character.inventory) == 1 for r in rows)
-                if not complete or not sound:
+                # Explicit storage needs only its own sound observation.
+                sound = all(observation.sound(r) for r in rows)
+                chosen_sound = all(observation.sound(r) for r in chosen)
+                if chosen and not chosen_sound:
                     state = 'incomplete'
                 elif len(chosen) > 1:
                     state = 'same_storage_multiple'
                 elif len(chosen) == 1:
                     state = 'match'
+                elif not complete or not sound:
+                    state = 'incomplete'
                 elif not rows:
                     state = 'missing'
                 elif len(rows) > 1:

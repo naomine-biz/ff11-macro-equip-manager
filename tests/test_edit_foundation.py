@@ -71,7 +71,7 @@ class FoundationTests(unittest.TestCase):
 
     def test_dependency_boundaries(self):
         root=Path(__file__).resolve().parents[1]/'ff11reader'
-        for name in ('domain','edit_values','editing','fixes','references','save_plan'):
+        for name in ('domain','edit_values','editing','fixes','references','save_plan','inventory_observation','macro_inventory','macro_links','wardrobe_usage'):
             tree=ast.parse((root/(name+'.py')).read_text(encoding='utf-8'))
             imports=[n.module or '' for n in ast.walk(tree) if isinstance(n,ast.ImportFrom)]
             imports += [a.name for n in ast.walk(tree) if isinstance(n,ast.Import) for a in n.names]
@@ -85,3 +85,10 @@ class FoundationTests(unittest.TestCase):
             self.assertIn('return execute_batch(',src)
             self.assertNotIn('os.replace(',src)
         self.assertNotIn('from .macro_saving', (root/'equipment_saving.py').read_text(encoding='utf-8'))
+
+        legacy=ast.parse((root/'saving.py').read_text(encoding='utf-8'))
+        execute=next(n for n in legacy.body if isinstance(n,ast.FunctionDef) and n.name=='execute_save')
+        calls=[n.func for n in ast.walk(execute) if isinstance(n,ast.Call)]
+        self.assertTrue(any(isinstance(f,ast.Name) and f.id=='execute_batch' for f in calls))
+        self.assertFalse(any((isinstance(f,ast.Name) and f.id=='atomic_replace') or
+                             (isinstance(f,ast.Attribute) and f.attr in ('write_bytes','replace')) for f in calls))

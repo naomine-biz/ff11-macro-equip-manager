@@ -88,3 +88,42 @@ class SaveTests(unittest.TestCase):
     def test_preview_stale_source_rejected(self):
         self.target.write_bytes(b'changed')
         with self.assertRaises(ValueError):saving.prepare_save(self.snapshot,self.c,1,'main')
+
+    def test_legacy_save_delegates_to_shared_transaction(self):
+        # D-05 / GAP-05: the CLI uses the same execution/rollback path as GUI.
+        from ff11reader import file_transaction
+        with patch.object(saving,'require_game_closed'), patch.object(file_transaction,'execute_batch',wraps=file_transaction.execute_batch) as execute:
+            folder=saving.execute_save(self.plan,self.backups)
+        self.assertEqual(execute.call_count,1)
+        receipt=json.loads((folder/'receipt.json').read_text(encoding='utf-8'))
+        self.assertEqual(receipt['target'],str(self.target))
+        self.assertEqual((folder/'original.dat').read_bytes(),self.original)
+
+    def test_post_write_decode_failure_rolls_back_legacy_save(self):
+        decode=saving.equipsets
+        def fail_after_write(raw,page):
+            if self.target.read_bytes()==self.plan.replacement:
+                raise ValueError('post-write decode failure')
+            return decode(raw,page)
+        with patch.object(saving,'require_game_closed'), patch.object(saving,'equipsets',side_effect=fail_after_write):
+            with self.assertRaises(Exception):saving.execute_save(self.plan,self.backups)
+        self.assertEqual(self.target.read_bytes(),self.original)
+        folder=next(self.backups.iterdir())
+        failure=json.loads((folder/'failure.json').read_text(encoding='utf-8'))
+        self.assertEqual(failure['rollback_errors'],[])
+
+    def test_legacy_rollback_preserves_external_update(self):
+        decode=saving.equipsets
+        external=b'external update'
+        def fail_after_write(raw,page):
+            if self.target.read_bytes()==self.plan.replacement:
+                self.target.write_bytes(external)
+                raise ValueError('external update during validation')
+            return decode(raw,page)
+        with patch.object(saving,'require_game_closed'), patch.object(saving,'equipsets',side_effect=fail_after_write):
+            with self.assertRaises(RuntimeError):saving.execute_save(self.plan,self.backups)
+        self.assertEqual(self.target.read_bytes(),external)
+        folder=next(self.backups.iterdir())
+        failure=json.loads((folder/'failure.json').read_text(encoding='utf-8'))
+        self.assertTrue(failure['rollback_errors'])
+        self.assertEqual((folder/'original.dat').read_bytes(),self.original)

@@ -12,10 +12,12 @@ def write_json(path,value):
 
 
 def execute_batch(plan, backup_root, root, validate, decode, kind, prefix, serialize,
-                  require_closed, write_record, restore):
+                  require_closed, write_record, restore, *, single_file_receipt=False):
     require_closed()
     root=Path(root).resolve();backup_root=Path(backup_root).resolve()
     if backup_root.is_relative_to(root):raise ValueError('バックアップ先はゲームフォルダの外に指定してください。')
+    if single_file_receipt and len(plan.files) != 1:
+        raise ValueError('単一ファイルのバックアップ形式には保存対象が1件必要です。')
     targets={Path(f.target).resolve() for f in plan.files}
     if not targets or len(targets)!=len(plan.files):raise ValueError('保存対象がないか、保存先が重複しています。')
     with ExitStack() as stack:
@@ -34,11 +36,17 @@ def execute_batch(plan, backup_root, root, validate, decode, kind, prefix, seria
         folder=backup_root/uuid4().hex;folder.mkdir(parents=True,exist_ok=False)
         receipt={'kind':kind,'character':plan.character,'files':[],'dependencies':dict(plan.dependencies)}
         for i,f in enumerate(plan.files):
-            filename=f'{i:03}.original.dat'
+            filename='original.dat' if single_file_receipt else f'{i:03}.original.dat'
             with (folder/filename).open('xb') as stream:
                 stream.write(f.original);stream.flush();os.fsync(stream.fileno())
             if (folder/filename).read_bytes()!=f.original:raise OSError('バックアップ検証に失敗しました。')
             receipt['files'].append({'target':f.target,'backup':filename,'page':f.page,'before_sha256':digest(f.original),'after_sha256':digest(f.replacement),'changes':[serialize(c) for c in f.changes]})
+        if single_file_receipt:
+            f=plan.files[0]
+            receipt={'target':f.target,'before_sha256':digest(f.original),
+                     'after_sha256':digest(f.replacement),
+                     'changes':[serialize(c) for c in f.changes],
+                     'dependencies':dict(plan.dependencies)}
         write_record(folder/'receipt.json',receipt)
         staged={}
         try:

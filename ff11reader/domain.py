@@ -20,6 +20,8 @@ class ItemReference:
     candidates: tuple[tuple[int, int], ...] = ()
     inventory_source: dict | None = None
     certainty: str = 'cache_observation_only'
+    reason: str | None = None
+    fix_target: tuple[int, int] | None = None
 
 
 @dataclass(frozen=True)
