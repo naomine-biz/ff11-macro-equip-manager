@@ -45,6 +45,13 @@ def edit_macro(character, macro, title, lines):
     return Edit('マクロを編集', (Change(character.folder_id, 'macros', macro_key(macro), macro, updated),))
 
 
+def edit_equipment_name(character, equipment, title):
+    if not isinstance(title,str):raise ValueError('名前は文字列で入力してください。')
+    updated=equipment if title==equipment.title.display else replace(equipment,title=Text(title,equipment.title.raw_hex,'draft'))
+    validate_text(updated.title)
+    return Edit('装備セット名を編集',(Change(character.folder_id,'equipsets',(equipment.number,),equipment,updated),))
+
+
 def plan_macro_fixes(character, items, address=None):
     refs = assess_macro_inventory(character, items)
     changes = []

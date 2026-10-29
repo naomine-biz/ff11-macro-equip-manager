@@ -3,7 +3,6 @@ import argparse
 from dataclasses import asdict
 import json
 from pathlib import Path
-from ff11reader.application import installations, load_snapshot
 
 
 def main():
@@ -11,6 +10,11 @@ def main():
     parser.add_argument('--root',type=Path)
     parser.add_argument('--export',type=Path)
     args=parser.parse_args()
+    if not args.export:
+        from ff11reader.startup import launch
+        launch(args.root)
+        return
+    from ff11reader.application import installations, load_snapshot
     roots=installations() if args.root is None else [str(args.root)]
     if len(roots)!=1: parser.error('Specify --root; discovered: '+str(roots))
     root=Path(roots[0]).resolve()
@@ -27,9 +31,6 @@ def main():
             'equipsets':sum(len(c.equipsets) for c in snapshot.characters),
             'inventory':sum(len(c.inventory) for c in snapshot.characters),
             'diagnostics':len(snapshot.diagnostics),'sources':len(snapshot.sources)},indent=2))
-    else:
-        from ff11reader.ui import show
-        show(snapshot)
 
 
 if __name__=='__main__': main()

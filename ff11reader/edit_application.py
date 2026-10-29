@@ -39,6 +39,13 @@ class Editor:
         macro=self._session.read(character,'macros',address)
         return deepcopy(edit_macro(current,macro,title,lines))
 
+    def prepare_equipment_name_edit(self,character,number,title):
+        if self.blocked:raise ValueError(self.blocked)
+        from .domain import Character
+        from .editing import edit_equipment_name
+        current=self._session.read(character,'equipsets',(number,))
+        return deepcopy(edit_equipment_name(Character(character),current,title))
+
     def _recover_save(self,snapshot):
         pending=self.store.path.with_suffix('.pending.json')
         if not pending.exists():return
@@ -127,10 +134,10 @@ class Editor:
         return self._save_checkpoint(preview,backup_root,next_session,execute_macro_save)
 
     @traced('editor.prepare_equipment_save')
-    def prepare_equipment_save(self,folder):
+    def prepare_equipment_save(self,folder,scope='reference-fix'):
         if self.blocked:raise ValueError(self.blocked)
         from .equipment_saving import prepare_equipment_save
-        return prepare_equipment_save(self._session.saved,self._session.working,folder)
+        return prepare_equipment_save(self._session.saved,self._session.working,folder,scope)
 
     @traced('editor.save_equipment')
     def save_equipment(self,preview,backup_root):
@@ -138,7 +145,7 @@ class Editor:
         from .saving import require_game_closed
         from .codecs import equipsets, BAGS
         from .references import assess_equipment
-        if preview!=self.prepare_equipment_save(preview.character):raise ValueError('編集内容が変わりました。保存プレビューを開き直してください。')
+        if preview!=self.prepare_equipment_save(preview.character,preview.scope):raise ValueError('編集内容が変わりました。保存プレビューを開き直してください。')
         require_game_closed()
         self.store.save(self._session)
         next_session=self._session.fork()
