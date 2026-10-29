@@ -59,7 +59,10 @@ class ReadingUITests(unittest.TestCase):
             search=next(w for w in popup.winfo_children() if type(w)==tk.Entry)
             groups,categories=[w for w in popup.winfo_children() if isinstance(w,ttk.Combobox)]
             listing=next(c for w in popup.winfo_children() for c in w.winfo_children() if isinstance(c,tk.Listbox))
-            search.focus_force();search.event_generate('<Shift-Tab>');app.update()
+            self.assertEqual(app.focus_get(),groups)
+            groups.event_generate('<Return>');app.update()
+            self.assertEqual(app.focus_get(),search)
+            search.event_generate('<Shift-Tab>');app.update()
             self.assertEqual(app.focus_get(),groups)
             self.assertEqual(listing.size(),4)
             groups.current(1);groups.event_generate('<<ComboboxSelected>>');app.update()

@@ -69,7 +69,7 @@ class PhraseEntry:
         scrollbar=ttk.Scrollbar(frame,command=listing.yview);listing.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side='right',fill='y');listing.pack(side='left',fill='both',expand=True)
         status=ttk.Label(popup,padding=10);status.pack(anchor='w')
-        ttk.Label(popup,text='Shift+Tab: 大分類へ　↓ / Enter: 候補へ　候補のEnter: 挿入　Esc: 取消',padding=10).pack(anchor='w')
+        ttk.Label(popup,text='大分類から選択　「すべて」でEnter: 全体検索へ　候補のEnter: 挿入　Esc: 取消',padding=10).pack(anchor='w')
         matches=[]
         def update(*_):
             matches[:]=self.catalog.search(query.get(),None if categories.current()==0 else category.get(),None if groups.current()==0 else group.get());listing.delete(0,'end')
@@ -105,5 +105,5 @@ class PhraseEntry:
         search.bind('<Down>',focus_list);search.bind('<Return>',focus_list)
         listing.bind('<Return>',choose);listing.bind('<Double-Button-1>',choose);listing.bind('<KeyPress>',type_query)
         popup.bind('<Escape>',close);popup.protocol('WM_DELETE_WINDOW',close)
-        update();search.focus_set()
+        update();groups.focus_set()
         return 'break'
