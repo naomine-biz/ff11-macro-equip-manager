@@ -180,7 +180,7 @@ class MacroSavingTests(unittest.TestCase):
             view.preview_game_save();app.update()
             window=next(w for w in app.winfo_children() if isinstance(w,tk.Toplevel))
             detail=next(w for w in window.winfo_children() if isinstance(w,tk.Text)).get('1.0','end')
-            self.assertIn('名前',detail);self.assertIn('未対応',detail)
+            self.assertIn('名前',detail);self.assertIn('マクロの編集をゲームに保存',detail)
             self.assertIn('作業データに残す',detail)
             for f in self.plan.files:self.assertEqual(Path(f.target).read_bytes(),f.original)
         finally:app.destroy()
@@ -189,7 +189,7 @@ class MacroSavingTests(unittest.TestCase):
         self.editor.undo()
         c=self.editor.session.working.characters[0];m=c.macros[0]
         self.editor.apply(edit_macro(c,m,'New',[l.display for l in m.lines]))
-        with self.assertRaisesRegex(ValueError,'名前.*未対応'):self.editor.prepare_macro_save('abc')
+        with self.assertRaisesRegex(ValueError,'名前.*マクロの編集をゲームに保存'):self.editor.prepare_macro_save('abc')
 
     def test_token_zero_bytes_japanese_padding_and_length_limit(self):
         token=bytes.fromhex('fd02000201fd')

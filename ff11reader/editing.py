@@ -36,7 +36,7 @@ def edit_macro(character, macro, title, lines):
     if len(lines) != 6 or any('\n' in s or '\r' in s or '\0' in s for s in [title, *lines]):
         raise ValueError('マクロは名前と6行で入力してください。')
     def text(before, value):
-        return before if before.display == value else Text(value, '', 'draft')
+        return before if before.display == value else Text(value, before.raw_hex, 'draft')
     updated = replace(macro, title=text(macro.title, title), lines=tuple(text(a, b) for a, b in zip(macro.lines, lines)))
     return Edit('マクロを編集', (Change(character.folder_id, 'macros', macro_key(macro), macro, updated),))
 
@@ -50,7 +50,7 @@ def plan_macro_fixes(character, items, address=None):
             continue
         fixes = {r.line: r.replacement for r in refs if r.address == key and r.replacement is not None}
         if fixes:
-            lines = tuple(Text(fixes[n], '', 'draft') if n in fixes else line for n, line in enumerate(macro.lines, 1))
+            lines = tuple(Text(fixes[n], line.raw_hex, 'draft') if n in fixes else line for n, line in enumerate(macro.lines, 1))
             changes.append(Change(character.folder_id, 'macros', key, macro, replace(macro, lines=lines)))
     return Edit('マクロの収納番号Fix', tuple(changes))
 

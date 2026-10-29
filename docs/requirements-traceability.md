@@ -28,10 +28,10 @@
 | [EDIT-004](../requirements.md#edit-004) | [draft_store.py](../ff11reader/draft_store.py)、[edit_application.py](../ff11reader/edit_application.py) | [EditingTests.test_persistence_redo_conflict_and_failed_save](../tests/test_editing.py) | 保存失敗・再開・競合を検証 |
 | [EDIT-005](../requirements.md#edit-005) | [draft_store.py](../ff11reader/draft_store.py)、[edit_application.py](../ff11reader/edit_application.py) | [EditingTests.test_corrupt_draft_is_preserved](../tests/test_editing.py) | 破損保護の部分検証。外部更新から再読込する全手順の専用検証は不足 |
 | [EDIT-006](../requirements.md#edit-006) | [editing.py](../ff11reader/editing.py)、[edit_application.py](../ff11reader/edit_application.py)、[ui.py](../ff11reader/ui.py) | [EditingUITests.test_edit_preview_undo_redo_fix_and_reopen](../tests/test_editing_ui.py) | マクロ編集を検証。装備セットの個別編集UIは未実装 |
-| [SAVE-001](../requirements.md#save-001) | [save_plan.py](../ff11reader/save_plan.py)、[macro_saving.py](../ff11reader/macro_saving.py)、[equipment_saving.py](../ff11reader/equipment_saving.py)、[ui.py](../ff11reader/ui.py) | [MacroSavingTests.test_unrelated_manual_edits_are_retained](../tests/test_macro_saving.py) | Fix保存と保留を検証。任意編集の保存は未実装 |
+| [SAVE-001](../requirements.md#save-001) | [save_plan.py](../ff11reader/save_plan.py)、[macro_saving.py](../ff11reader/macro_saving.py)、[equipment_saving.py](../ff11reader/equipment_saving.py)、[ui.py](../ff11reader/ui.py) | [MacroSavingTests.test_unrelated_manual_edits_are_retained](../tests/test_macro_saving.py) | Fix限定保存と保留に加え、[test_manual_macro_saving.py](../tests/test_manual_macro_saving.py)で名前・各行の一般保存を検証 |
 | [SAVE-002](../requirements.md#save-002) | [macro_saving.py](../ff11reader/macro_saving.py)、[equipment_saving.py](../ff11reader/equipment_saving.py)、[file_transaction.py](../ff11reader/file_transaction.py) | [MacroSavingTests.test_stale_macro_inventory_and_plan_tamper_rejected](../tests/test_macro_saving.py) | マクロの競合を検証。装備保存にも同等テストあり |
 | [SAVE-003](../requirements.md#save-003) | [file_transaction.py](../ff11reader/file_transaction.py) | [EquipmentSavingTests.test_candidate_changes_and_staging_failure](../tests/test_equipment_saving.py) | 装備保存の準備失敗を検証 |
-| [SAVE-004](../requirements.md#save-004) | [macro_saving.py](../ff11reader/macro_saving.py)、[saving.py](../ff11reader/saving.py)、[codecs.py](../ff11reader/codecs.py) | [MacroSavingTests.test_token_zero_bytes_japanese_padding_and_length_limit](../tests/test_macro_saving.py) | 既存Fixの形式検証。新規定型文編集のエンコードは未実装 |
+| [SAVE-004](../requirements.md#save-004) | [macro_saving.py](../ff11reader/macro_saving.py)、[saving.py](../ff11reader/saving.py)、[codecs.py](../ff11reader/codecs.py) | [MacroSavingTests.test_token_zero_bytes_japanese_padding_and_length_limit](../tests/test_macro_saving.py) | [macro_text.py](../ff11reader/macro_text.py)で手編集のCP932・上限・既存定型文保持も検証。新規定型文の選択UIは未実装 |
 | [SAVE-005](../requirements.md#save-005) | [file_transaction.py](../ff11reader/file_transaction.py)、[edit_application.py](../ff11reader/edit_application.py) | [EquipmentSavingTests.test_failed_rollback_keeps_pending_and_blocks_edits](../tests/test_equipment_saving.py) | 復旧待ちを検証。外部更新は復元テストも参照 |
 | [SAVE-006](../requirements.md#save-006) | [edit_application.py](../ff11reader/edit_application.py)、[draft_store.py](../ff11reader/draft_store.py) | [MacroSavingTests.test_draft_checkpoint_failure_recovers_on_restart](../tests/test_macro_saving.py) | 同期失敗を検証。保存後Undoは保存テストでも検証 |
 | [VIEW-001](../requirements.md#view-001) | [ui.py](../ff11reader/ui.py) | — | 専用自動テストなし。画面で確認する |
@@ -112,7 +112,7 @@ GAP-02の未読込収納に行が残る入力は、現行デコーダーで発�
 
 | 要件・仕様 | 現状 | 後続で必要な実装 |
 |---|---|---|
-| SAVE-001、EX-S15 | 現保存対象は収納番号Fix・装備位置Fix。任意編集は保留 | マクロ名・6行の形式変換と保存。DESIGN-01/02を先に扱う |
+| SAVE-001、EX-S15 | マクロ名・6行の手編集保存を実装済み | 定型文の新規選択UIは今後対応 |
 | EDIT-006、EX-B12、PT-19 | 汎用Changeで枠の値を扱えるが、個別編集・候補手動選択のUIと一般保存はない | 名前・keep/remove/equip・手動選択の編集と保存 |
 | FUT-001/002、EX-F01〜04、PT-32/33 | 移動・カスケード・キャラ間コピー未実装 | 衝突規則、依存更新、一括保存、コピー先の再評価 |
 | DATA-001、EX-D02 | キャラの表示名登録とフォルダ切替はあるが、アカウント別整理は未実装 | アカウント識別と整理の仕様確定・実装 |
@@ -180,7 +180,7 @@ v2作業ファイルは履歴の各対象の最初のbeforeからbaselineを復�
 
 検証結果: 既存テストを含む128件中122件成功、GUI関連6件スキップ。Property Testには複数の生成ケースと操作列を含むため、メソッド件数と生成ケース数は異なる。
 
-残る範囲: PT-19の手動候補選択UI、任意編集の一般保存、生成範囲外の辞書変更・全文字列形式、OSレベルの障害とGUI。新しい機能や境界を追加する際に生成器を拡張する。
+当時残っていた範囲: PT-19の手動候補選択UI、任意編集の一般保存、生成範囲外の辞書変更・全文字列形式、OSレベルの障害とGUI。新しい機能や境界を追加する際に生成器を拡張する。
 
 ## 編集中の待機カーソル（2026-10-28）
 
@@ -229,3 +229,13 @@ python -B experiments/persistent_edit_store.py
 未改善: 作業ファイル自体は依然全体を書き出す。初期読込・保存計画時の全体取得・保存後状態の取込みにもデータ量に応じた処理がある。将来の持ち物更新操作では装備参照の再評価範囲を追加する必要がある。
 
 検証時の記録: 合成GUI検証に実ゲーム読込テストを誤って含め、読み取りが発生した。Fixボタンの有効性確認で停止し、ゲームへの書込みは実行していない。実ゲームUIテストを`FF11_RUN_GAME_INTEGRATION`へ分離し、以降の検証から除外した。
+
+## マクロ名・各行の手編集保存（2026-10-28）
+
+SAVE-001/004/006、EX-S15、EX-MS01〜07、PT-23/24に対応。`macro_text.py`がCP932変換・名前8バイト/行60バイト・定型文の元ID保持を担当する。`editing.py`は変更したTextの元フィールドバイトを保持し、Undo/Redo・作業再開後も変換根拠を残す。旧作業ファイルで元バイトが空の変更は現在の保存済みフィールドを根拠にする。そこにもないトークンの復元は拒否する。
+
+`macro_saving.py`の一般保存範囲は名前と6行。変換不能な変更があれば計画全体を拒否する。名前をline=0、行を1〜6として変更位置を記録し、既存トランザクションでバックアップ・直前再検証・置換・復旧を行う。保存済み状態の更新には名前も含める。バックアップ種別は`macro-edit`で、復元関数は従来の`macro-storage-fix`も受け付ける。旧Fix限定APIは維持し、一般保存では持ち物による一意判定を要求しない。定型文を扱う場合は辞書を依存資料として確認する。
+
+画面の「マクロの編集をゲームに保存…」から、選択キャラの名前・行の変更をプレビューする。定型文の新規挿入・選択UIは未実装。既存の括弧付き表示を維持して周囲を編集する、定型文を削除する、Undoで戻す操作を扱う。同表示の異ID・通常文字との衝突・元にない定型文表記はエラーにする。
+
+検証: 全体146件中139件成功、GUI関連7件スキップ。その後、空への変更と未知トークンを含む未変更行の保持を追加し、合成GUIを含む関連25件が成功。通常文字・CP932境界・トークン内部ゼロ・未解決ID・曖昧性・再開・削除後Undo保存・2ファイル途中失敗・作業同期失敗を検証した。6seedの名前/6行編集は固定オフセットで独立に組み立てた期待バイトと照合した。実データへの書込みは行っていない。

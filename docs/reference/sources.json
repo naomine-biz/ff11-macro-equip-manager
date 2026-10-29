@@ -25,7 +25,11 @@
     "accessed": "2026-10-27",
     "urls": [
       "https://github.com/alicestellar/MacroEditor/blob/d5b33ec89da8518b520dbab4a052ba73b24b713c/Macro%20Editor/MacroFileManager.cs"
-    ]
+    ],
+    "macro_edit_review": {
+      "accessed": "2026-10-28",
+      "observed": "Reads name at record+370, takes 8 characters; writes name to 9 bytes plus one NUL. Lines use 61 bytes. App applies a conservative 8-byte CP932 title limit and does not adopt Encoding.Default or truncation."
+    }
   },
   {
     "id": "S03",
@@ -190,7 +194,11 @@
       "https://github.com/Windower/POLUtils/blob/b2e8b10933544e1e0cd37afd4e0bb3f34649f898/PlayOnline.FFXI.Utils.MacroManager/MacroSet.cs",
       "https://github.com/Windower/POLUtils/blob/b2e8b10933544e1e0cd37afd4e0bb3f34649f898/PlayOnline.FFXI.Utils.MacroManager/Macro.cs",
       "https://github.com/Windower/POLUtils/blob/b2e8b10933544e1e0cd37afd4e0bb3f34649f898/LICENSE.txt"
-    ]
+    ],
+    "macro_edit_review": {
+      "accessed": "2026-10-28",
+      "observed": "Macro.cs reads/writes six 61-byte command fields and a 10-byte name field. Its byte truncation is not adopted."
+    }
   },
   {
     "id": "S12",

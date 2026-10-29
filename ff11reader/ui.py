@@ -124,7 +124,7 @@ class ReaderWindow:
   self.redo_button=ttk.Button(history,text='Redo',command=self.redo_edit);self.redo_button.pack(side='left',expand=True,fill='x')
   self.draft_label=ttk.Label(right,text='');self.draft_label.pack(fill='x')
   ttk.Button(right,text='装備セットの補正をゲームに保存…',command=self.preview_equipment_save).pack(fill='x',pady=(0,6))
-  ttk.Button(right,text='マクロの収納番号をゲームに保存…',command=self.preview_game_save).pack(fill='x',pady=(0,6))
+  ttk.Button(right,text='マクロの編集をゲームに保存…',command=lambda:self.preview_game_save('all')).pack(fill='x',pady=(0,6))
   ttk.Button(right,text='作業ファイルを保管して編集をリセット',command=self.reset_edits).pack(fill='x',pady=(0,6))
   ttk.Label(right,text='Item / Help',font=('MS Gothic',14,'bold')).pack(anchor='w',pady=(0,12))
   self.detail=tk.Text(right,width=38,wrap='word',font=('MS Gothic',10),bg='#101b38',fg='#edf1fa',insertbackground='white',selectbackground='#354b7a',relief='sunken',borderwidth=1,padx=12,pady=12,state='disabled')
@@ -228,13 +228,13 @@ class ReaderWindow:
   if not messagebox.askyesno('編集をリセット','現在の作業ファイルを保管し、読込時の状態から編集を開始しますか？',parent=self.app):return
   try:self.run_edit(self.editor.start_fresh)
   except (OSError,ValueError) as e:messagebox.showerror('リセット',str(e),parent=self.app);return
- def preview_game_save(self):
+ def preview_game_save(self,scope='storage-fix'):
   if not self.character:return
-  try:plan=self.editor.prepare_macro_save(self.character.folder_id)
+  try:plan=self.editor.prepare_macro_save(self.character.folder_id,scope)
   except (OSError,ValueError,RuntimeError) as e:messagebox.showerror('保存プレビュー',str(e),parent=self.app);return
-  window=tk.Toplevel(self.app,background='#080f22');window.title('マクロ収納番号Fix / ゲームへの保存');window.geometry('980x680')
+  window=tk.Toplevel(self.app,background='#080f22');window.title('マクロの編集 / ゲームへの保存' if scope=='all' else 'マクロ収納番号Fix / ゲームへの保存');window.geometry('980x680')
   count=sum(len(f.changes) for f in plan.files)
-  ttk.Label(window,text=f'{self.character.display_name or self.character.folder_id} · {count}行 / {len(plan.files)}ファイル · 保留 {plan.deferred}件（詳細は下記）',padding=10).pack(anchor='w')
+  ttk.Label(window,text=f'{self.character.display_name or self.character.folder_id} · {count}項目 / {len(plan.files)}ファイル · 保留 {plan.deferred}件（詳細は下記）',padding=10).pack(anchor='w')
   ttk.Label(window,text='FF11とPlayOnlineを終了してから保存してください。対象ファイルをすべてバックアップして保存します。保存完了まではゲームを起動しないでください。',padding=10).pack(anchor='w')
   text=tk.Text(window,bg='#101b38',fg='#edf1fa',wrap='word',padx=12,pady=12)
   bar=ttk.Scrollbar(window,command=text.yview);text.configure(yscrollcommand=bar.set);bar.pack(side='right',fill='y');text.pack(fill='both',expand=True)
@@ -242,7 +242,8 @@ class ReaderWindow:
    text.insert('end',file.target+'\n')
    for change in file.changes:
     b,p,bank,key=change.address
-    text.insert('end',f'ブック {b:02} / パレット {p} / {bank.upper()} {key if key<10 else 0} / {change.line}行目\n  前: {change.before}\n  後: {change.after}\n\n')
+    field='名前' if change.line==0 else f'{change.line}行目'
+    text.insert('end',f'ブック {b:02} / パレット {p} / {bank.upper()} {key if key<10 else 0} / {field}\n  前: {change.before}\n  後: {change.after}\n\n')
   if plan.deferred_changes:
    text.insert('end','作業データに残す変更\n')
    for change in plan.deferred_changes:text.insert('end',f'{change.target}: {change.reason}\n')
@@ -252,8 +253,8 @@ class ReaderWindow:
    try:backup=self.editor.save_macros(plan,Path(__file__).resolve().parent.parent/'backups'/'macros')
    except (OSError,ValueError,RuntimeError) as e:
     self.update_edit_status();messagebox.showerror('ゲームへの保存',str(e),parent=window);button.configure(state='normal');return
-   window.destroy();self.refresh_edits();self.footer.configure(text=f'{count}行を保存・検証しました。バックアップ: {backup}')
-  button=ttk.Button(window,text=f'バックアップして{count}行をゲームに保存',command=save);button.pack(pady=12)
+   window.destroy();self.refresh_edits();self.footer.configure(text=f'{count}項目を保存・検証しました。バックアップ: {backup}')
+  button=ttk.Button(window,text=f'バックアップして{count}項目をゲームに保存',command=save);button.pack(pady=12)
  def preview_equipment_save(self):
   if not self.character:return
   try:plan=self.editor.prepare_equipment_save(self.character.folder_id)
@@ -471,6 +472,7 @@ class ReaderWindow:
   c=self.character;macro=next(m for m in c.macros if macro_key(m)==self.active_macro)
   window=tk.Toplevel(self.app,background='#080f22');window.title('マクロを編集');window.geometry('800x400')
   ttk.Label(window,text=f'ブック {macro.book:02} / パレット {macro.palette} / {macro.bank.upper()} {macro.key if macro.key<10 else 0}',padding=10).pack(anchor='w')
+  ttk.Label(window,text='保存上限: 名前8バイト・各行60バイト（CP932）。既存の定型文は括弧ごと保持します。',padding=(10,0,10,4)).pack(anchor='w')
   entries=[]
   for label,value in [('名前',macro.title.display)]+[(f'{i}行目',line.display) for i,line in enumerate(macro.lines,1)]:
    row=ttk.Frame(window);row.pack(fill='x',padx=12,pady=4)

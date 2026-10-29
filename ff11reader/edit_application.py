@@ -101,16 +101,16 @@ class Editor:
         self.blocked = None
 
     @traced('editor.prepare_macro_save')
-    def prepare_macro_save(self,folder):
+    def prepare_macro_save(self,folder,scope='storage-fix'):
         if self.blocked:raise ValueError(self.blocked)
         from .macro_saving import prepare_macro_save
-        return prepare_macro_save(self._session.saved,self._session.working,folder)
+        return prepare_macro_save(self._session.saved,self._session.working,folder,scope)
 
     @traced('editor.save_macros')
     def save_macros(self,preview,backup_root):
         from .macro_saving import execute_macro_save
         from .saving import require_game_closed
-        if preview!=self.prepare_macro_save(preview.character):raise ValueError('編集内容が変わりました。保存プレビューを開き直してください。')
+        if preview!=self.prepare_macro_save(preview.character,preview.scope):raise ValueError('編集内容が変わりました。保存プレビューを開き直してください。')
         require_game_closed()
         self.store.save(self._session)  # Verify draft ownership and writable storage first.
         next_session=self._session.fork()
@@ -119,7 +119,10 @@ class Editor:
         changes={(change.address,change.line):change for f in preview.files for change in f.changes}
         from .editing import macro_key
         from .domain import Text
-        character.macros=[replace(m,lines=tuple(Text(changes[(macro_key(m),n)].after,changes[(macro_key(m),n)].replacement.hex(),'cp932') if (macro_key(m),n) in changes else line for n,line in enumerate(m.lines,1))) for m in character.macros]
+        def changed(m,n,old):
+            change=changes.get((macro_key(m),n))
+            return Text(change.after,change.replacement.hex(),'cp932') if change else old
+        character.macros=[replace(m,title=changed(m,0,m.title),lines=tuple(changed(m,n,line) for n,line in enumerate(m.lines,1))) for m in character.macros]
         next_session.saved=saved
         return self._save_checkpoint(preview,backup_root,next_session,execute_macro_save)
 
