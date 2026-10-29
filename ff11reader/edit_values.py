@@ -56,6 +56,10 @@ def validate_transition(before,after,kind):
     if kind=='equipsets':
         for a,b in zip(before.slots,after.slots):
             if slot_value(a)==slot_value(b):continue  # Preserve unedited unknown source values.
-            if b.action not in ('keep','remove','equip'):raise ValueError('装備枠の動作が不正です。')
-            if b.action=='equip' and not (integer(b.item_id,1,65534) and integer(b.container,0,16) and integer(b.index,1,80)):raise ValueError('装備枠の参照値が不正です。')
-            if b.action in ('keep','remove') and (b.item_id,b.container,b.index)!=(None,None,None):raise ValueError('装備しない枠の参照値は空にしてください。')
+            validate_slot(b)
+
+
+def validate_slot(slot):
+    if slot.name not in SLOT_NAMES or slot.action not in ('keep','remove','equip'):raise ValueError('装備枠の動作または部位が不正です。')
+    if slot.action=='equip' and not (integer(slot.item_id,1,65534) and integer(slot.container,0,16) and integer(slot.index,1,80)):raise ValueError('装備枠の参照値が不正です。')
+    if slot.action in ('keep','remove') and (slot.item_id,slot.container,slot.index)!=(None,None,None):raise ValueError('装備しない枠の参照値は空にしてください。')

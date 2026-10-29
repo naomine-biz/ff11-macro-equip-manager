@@ -105,5 +105,6 @@ def item_records(data, icon_ids=None):
         items[item]={'name':name.display if name else None,
                      'name_state':name.state if name else 'unknown',
                      'type':struct.unpack_from('<H',b,10)[0],
+                     'equip_slots':tuple(s for n,s in enumerate(SLOTS) if struct.unpack_from('<H',b,0x12)[0]&(1<<n)) if 0x2800<=item<0x7000 else (),
                      'icon_png':item_icon(b) if icon_ids is not None and item in icon_ids else None}
     return items

@@ -11,11 +11,11 @@ from uuid import uuid4
 
 def _types():
     from .macro_saving import MacroSavePlan, MacroFile, LineChange
-    from .equipment_saving import EquipmentSavePlan, EquipmentFile, EquipmentNameChange
+    from .equipment_saving import EquipmentSavePlan, EquipmentFile, EquipmentNameChange, EquipmentSlotChange
     from .fixes import FixChange
     from .domain import TextToken
     from .save_plan import DeferredChange
-    return {c.__name__:c for c in (MacroSavePlan,MacroFile,LineChange,EquipmentSavePlan,EquipmentFile,EquipmentNameChange,FixChange,TextToken,DeferredChange)}
+    return {c.__name__:c for c in (MacroSavePlan,MacroFile,LineChange,EquipmentSavePlan,EquipmentFile,EquipmentNameChange,EquipmentSlotChange,FixChange,TextToken,DeferredChange)}
 
 
 def encode(value):

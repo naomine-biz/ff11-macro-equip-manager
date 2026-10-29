@@ -39,6 +39,16 @@ class Editor:
         macro=self._session.read(character,'macros',address)
         return deepcopy(edit_macro(current,macro,title,lines))
 
+    def equipment_candidates(self,character,slot,query=''):
+        from .equipment_editing import candidates
+        return candidates(self._session.character(character),self._session.item_catalog(),slot,query)
+
+    def prepare_equipment_slot_edit(self,character,number,slot,action,selection=None):
+        if self.blocked:raise ValueError(self.blocked)
+        from .equipment_editing import edit_slot
+        current=self._session.read(character,'equipsets',(number,))
+        return edit_slot(self._session.character(character),self._session.item_catalog(),current,slot,action,selection)
+
     def prepare_equipment_name_edit(self,character,number,title):
         if self.blocked:raise ValueError(self.blocked)
         from .domain import Character

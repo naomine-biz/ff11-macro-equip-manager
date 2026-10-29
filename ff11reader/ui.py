@@ -102,6 +102,8 @@ class ReaderWindow:
   ActionButton(right,busy=True,text='装備セットの参照位置を補正',command=self.preview_fixes).pack(fill='x',pady=(0,6))
   ttk.Button(right,text='マクロの収納番号を確認・補正',command=self.show_macro_inventory).pack(fill='x',pady=(0,6))
   ttk.Button(right,text='ワードローブの未参照アイテム',command=self.show_unused_wardrobe).pack(fill='x',pady=(0,6))
+  self.active_slot=None
+  self.slot_edit_button=ActionButton(right,busy=True,text='選択した装備枠を編集',command=self.edit_selected_slot,state='disabled');self.slot_edit_button.pack(fill='x',pady=(0,6))
   self.equipment_name_button=ActionButton(right,text='選択した装備セットの名前を編集',command=self.edit_selected_equipment_name,state='disabled');self.equipment_name_button.pack(fill='x',pady=(0,6))
   self.edit_button=ActionButton(right,busy=True,text='選択マクロを編集',command=self.edit_selected_macro,state='disabled');self.edit_button.pack(fill='x',pady=(0,6))
   history=ttk.Frame(right);history.pack(fill='x',pady=(0,6))
@@ -241,7 +243,7 @@ class ReaderWindow:
    window.destroy();self.refresh_edits();self.footer.configure(text=f'{count}項目を保存・検証しました。バックアップ: {backup}')
   button=ActionButton(window,busy=True,text=f'バックアップして{count}項目をゲームに保存（必要時に管理者確認）',command=save);button.pack(pady=12)
  def preview_equipment_save(self):
-  from .equipment_saving import EquipmentNameChange
+  from .equipment_saving import EquipmentNameChange, EquipmentSlotChange
   if not self.character:return
   try:plan=self.editor.prepare_equipment_save(self.character.folder_id,'all')
   except (OSError,ValueError,RuntimeError) as e:dialogs.showerror('保存プレビュー',str(e),parent=self.app);return
@@ -254,6 +256,8 @@ class ReaderWindow:
   for file in plan.files:
    text.insert('end',file.target+'\n')
    for change in file.changes:
+    if isinstance(change,EquipmentSlotChange):
+     text.insert('end',f'{self.equipset_label(change.equipset,self.character)} / {SLOTS[change.slot]}\n  前: {self.slot_description(change.before)}\n  後: {self.slot_description(change.after)}\n\n');continue
     if isinstance(change,EquipmentNameChange):
      text.insert('end',f'装備セット {change.equipset:03} / 名前\n  前: {change.before}\n  後: {change.after}\n\n');continue
     text.insert('end',f'{self.equipset_label(change.equipset,self.character)} / {SLOTS[change.slot]} / {self.item_name(change.item_id)} (ID {change.item_id})\n  前: {BAGS.get(change.before[0],change.before[0])} / 位置 {change.before[1]}\n  後: {BAGS[change.after[0]]} / 位置 {change.after[1]}\n\n')
@@ -272,7 +276,7 @@ class ReaderWindow:
  @traced('ui.change_mode')
  def change_mode(self):
   if not self.character:return
-  self.active_macro=None;self.edit_button.configure(state='disabled');self.equipment_name_button.configure(state='disabled')
+  self.active_macro=None;self.edit_button.configure(state='disabled');self.equipment_name_button.configure(state='disabled');self.active_slot=None;self.slot_edit_button.configure(state='disabled')
   self.nav.delete(0,'end');c=self.character;mode=self.mode.get();self.navigation=[]
   self.macro_tree.delete(*self.macro_tree.get_children())
   self.macro_tree.pack_forget();self.nav.pack_forget()
@@ -330,7 +334,7 @@ class ReaderWindow:
   self.expand_macro_book(selection[0])
   parts=selection[0].split('-')
   if parts[0]=='book':
-   self.active_macro=None;self.edit_button.configure(state='disabled');self.equipment_name_button.configure(state='disabled')
+   self.active_macro=None;self.edit_button.configure(state='disabled');self.equipment_name_button.configure(state='disabled');self.active_slot=None;self.slot_edit_button.configure(state='disabled')
    self.clear_cards();self.selected=None
    self.heading.configure(text=self.macro_tree.item(selection[0],'text'))
    self.subtitle.configure(text='パレットを選択してください。')
@@ -394,6 +398,7 @@ class ReaderWindow:
   if previous is not None and previous.winfo_exists():previous.configure(highlightbackground=previous.normal_border,highlightthickness=1)
   self.active_card=frame;frame.configure(highlightbackground='#fff1bc',highlightthickness=1);command()
  def render_equipment(self,equipset):
+  self.active_slot=None;self.slot_edit_button.configure(state='disabled')
   self.heading.configure(text=self.equipset_label(equipset.number))
   refs=self.macro_links.for_set(equipset.number)
   summary=f'マクロ参照: {len(refs)}行' if refs else 'マクロ参照なし'
@@ -412,6 +417,7 @@ class ReaderWindow:
   body+='\n\nFix可能な枠は、上のボタンから変更案を確認できます。'
   self.show_detail('装備セット '+self.equipset_label(equipset.number),body)
  def inspect_slot(self,slot):
+  self.active_slot=slot.name;self.slot_edit_button.configure(state='disabled' if self.editor.blocked else 'normal')
   a=slot.item_reference;view=present_slot(slot,self.selected.number,self.fix_plan)
   label=ACTION_STYLE[view.status][0]
   text=f'{label}\n{view.instruction}\n\n'
@@ -437,7 +443,7 @@ class ReaderWindow:
   text+='\n\n補足\n照合条件: 収納・内部位置・種類ID。候補は読み取れたインベントリから検索します。保存情報の更新タイミングは調査中です。'
   self.show_detail(title,primary,actions[:8] if view.status in ('multiple','needs_review','fixable') else (),evidence=text)
  def render_macros(self,address):
-  self.active_macro=None;self.edit_button.configure(state='disabled');self.equipment_name_button.configure(state='disabled')
+  self.active_macro=None;self.edit_button.configure(state='disabled');self.equipment_name_button.configure(state='disabled');self.active_slot=None;self.slot_edit_button.configure(state='disabled')
   book,palette=address;self.heading.configure(text=f'ブック {book} / パレット {palette}');self.subtitle.configure(text='マクロをクリックすると全6行を表示します。')
   macros=[m for m in self.character.macros if (m.book,m.palette)==address]
   for row,title in [(0,'Ctrl'),(2,'Alt')]:
@@ -456,6 +462,21 @@ class ReaderWindow:
   inventory=[r for r in self.macro_item_refs if r.address==macro_key(macro)]
   if inventory:body+='\n\nアイテム参照\n'+'\n'.join(f'{r.line}行目: {MACRO_ITEM_LABELS[r.state]}' for r in inventory)
   self.show_detail(macro.title.display or '（空欄マクロ）',(warning+'\n\n' if warning else '')+body)
+ def slot_description(self,fields):
+  action,item,bag,index=fields
+  if action!='equip':return {'keep':'変更しない','remove':'外す'}.get(action,'未知の動作')
+  return f'装備する: {self.item_name(item)} (ID {item}) / {BAGS.get(bag,bag)} / 内部位置 {index}'
+ def edit_selected_slot(self):
+  if self.mode.get()!='装備セット' or not self.selected or not self.active_slot:return
+  from .equipment_ui import SlotEditor
+  number=self.selected.number;name=self.active_slot;folder=self.character.folder_id
+  slot=next(s for s in self.selected.slots if s.name==name)
+  rows=self.editor.equipment_candidates(folder,name)
+  def preview(action,selection,parent):
+   try:edit=self.editor.prepare_equipment_slot_edit(folder,number,name,action,selection)
+   except ValueError as e:dialogs.showerror('入力内容',str(e),parent=parent);return
+   self.preview_edit(edit,lambda:self.editor.apply(edit),parent)
+  self.slot_editor=SlotEditor(self.app,self.equipset_label(number)+' / '+SLOTS[name],slot,rows,self.snapshot.items,BAGS,preview)
  def edit_selected_equipment_name(self):
   if self.mode.get()!='装備セット' or not self.selected:return
   number=self.selected.number;character=self.character.folder_id
@@ -491,11 +512,18 @@ class ReaderWindow:
   scrollbar=ttk.Scrollbar(window,command=text.yview);text.configure(yscrollcommand=scrollbar.set)
   scrollbar.pack(side='right',fill='y');text.pack(fill='both',expand=True)
   count=0
+  from .edit_values import value
   for change in edit.changes:
-   if change.before==change.after:continue
+   if value(change.before)==value(change.after):continue
    count+=1
    if change.kind=='equipsets':
-    text.insert('end',f'装備セット {change.key[0]:03} / 名前\n  前: {change.before.title.display}\n  後: {change.after.title.display}\n\n');continue
+    from .edit_values import slot_value
+    slot_fields=lambda s:slot_value(s)[1:]
+    text.insert('end',f'装備セット {change.key[0]:03}  {change.before.title.display}\n')
+    if change.before.title.display!=change.after.title.display:text.insert('end',f'名前\n  前: {change.before.title.display}\n  後: {change.after.title.display}\n')
+    for before,after in zip(change.before.slots,change.after.slots):
+     if slot_fields(before)!=slot_fields(after):text.insert('end',f'{SLOTS[before.name]}\n  前: {self.slot_description(slot_fields(before))}\n  後: {self.slot_description(slot_fields(after))}\n')
+    text.insert('end','\n');continue
    b,p,bank,key=change.key
    text.insert('end',f'ブック {b:02} / パレット {p} / {bank.upper()} {key if key<10 else 0}  {change.before.title.display}\n')
    if change.before.title!=change.after.title:text.insert('end',f'名前: {change.before.title.display} → {change.after.title.display}\n')

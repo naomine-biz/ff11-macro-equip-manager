@@ -52,7 +52,9 @@ class LocalReader:
                 self.diagnostics.append({'code':'master_table_truncated','logical_id':logical}); continue
             packed=struct.unpack_from('<H',table,logical*2)[0]
             result=self.guarded(self.root/'ROM'/str(packed>>7)/f'{packed&127}.DAT',lambda b:codecs.item_records(b,icon_ids))
-            if result: items.update(result)
+            if result:
+                source_path=str((self.root/'ROM'/str(packed>>7)/f'{packed&127}.DAT').resolve())
+                items.update({key:dict(value,source_path=source_path) for key,value in result.items()})
         return items
 
     def load_phrases(self):
