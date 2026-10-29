@@ -25,10 +25,18 @@ class ItemReference:
 
 
 @dataclass(frozen=True)
+class TextToken:
+    start: int
+    end: int
+    identity: str
+
+
+@dataclass(frozen=True)
 class Text:
     display: str
     raw_hex: str
     state: str
+    tokens: tuple[TextToken, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -126,3 +134,5 @@ class Snapshot:
         'read_macros': True, 'read_equipsets': True,
         'inventory': 'local_cache_partial_freshness_unknown',
         'augments': 'unsupported', 'write': 'equipset_reference_single_file_guarded'})
+    phrases: dict = field(default_factory=dict)
+    phrase_readings: dict = field(default_factory=dict)

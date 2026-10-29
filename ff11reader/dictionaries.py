@@ -3,7 +3,7 @@ import struct
 from .codecs import text
 
 
-def auto_translate(data):
+def auto_translate(data, readings=None):
     result={}; pos=0
     while pos<len(data):
         if pos+4>len(data): raise ValueError('Truncated auto-translate header')
@@ -22,6 +22,7 @@ def auto_translate(data):
                 if pos>=len(data): raise ValueError('Missing Japanese reading length')
                 length=data[pos]; pos+=1
                 if pos+length>len(data): raise ValueError('Truncated Japanese reading')
+                if readings is not None: readings[key]=text(data[pos:pos+length]).display
                 pos+=length
         result[key]=text(name).display
     return result

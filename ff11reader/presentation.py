@@ -27,3 +27,7 @@ def present_slot(slot, equipset, plan):
              'ambiguous_target':'候補の位置を一意に決められません。詳細を確認してください。',
              'invalid_reference':'保存された参照値を確認してください。'}
     return SlotPresentation('needs_review',reasons.get(reason, 'この枠の詳細を確認してください。'))
+
+
+def format_token_ids(tokens):
+    return ", ".join(token.identity for token in tokens or ()) or "なし"

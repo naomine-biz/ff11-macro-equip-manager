@@ -8,8 +8,11 @@ def key(value):
     if isinstance(value,Equipset):return (value.number,)
     raise ValueError('編集対象の型が不正です。')
 
+def text_value(text):return text.display,tuple(text.tokens or ())
+
+
 def value(item):
-    if isinstance(item,Macro):return key(item),item.title.display,tuple(x.display for x in item.lines)
+    if isinstance(item,Macro):return key(item),text_value(item.title),tuple(text_value(x) for x in item.lines)
     if isinstance(item,Equipset):return key(item),item.title.display,tuple(slot_value(s) for s in item.slots)
     raise ValueError('編集対象の型が不正です。')
 
@@ -28,8 +31,10 @@ def snapshot_value(snapshot):
     return dict(pairs)
 
 def validate_text(text):
+    from .text_editing import validate_tokens
     if not isinstance(text,Text) or not isinstance(text.display,str) or any(c in text.display for c in ('\n','\r','\0')):
         raise ValueError('文字列に改行・NULを含めることはできません。')
+    validate_tokens(text)
 
 def integer(n,low,high):return type(n) is int and low<=n<=high
 

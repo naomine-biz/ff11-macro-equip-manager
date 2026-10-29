@@ -60,7 +60,7 @@ def load_snapshot(root):
     except (OSError,ValueError) as exc:
         reader.diagnostics.append({'code':'labels_unreadable','message':str(exc)})
     return Snapshot(str(uuid4()),datetime.now(timezone.utc).isoformat(),
-                    characters,items,reader.sources,reader.diagnostics,installation_key)
+                    characters,items,reader.sources,reader.diagnostics,installation_key,phrases=phrases,phrase_readings=reader.phrase_readings)
 
 
 def set_character_label(snapshot,character,name):

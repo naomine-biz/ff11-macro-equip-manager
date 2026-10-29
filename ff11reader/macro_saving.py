@@ -11,7 +11,8 @@ from uuid import uuid4
 from .codecs import checked, macros, BAGS
 from .domain import Text
 from .macro_text import patch_text
-from .edit_values import validate_structure
+from .edit_values import validate_structure, text_value
+from .text_editing import remap_text
 from .editing import macro_key
 from .macro_inventory import assess_macro_inventory, parse_equip
 from .saving import digest, locked_read, atomic_replace, require_game_closed
@@ -28,6 +29,8 @@ class LineChange:
     original: bytes
     replacement: bytes
     provenance: bytes = b''
+    tokens: tuple | None = None
+    original_tokens: tuple | None = None
 
 
 @dataclass(frozen=True)
@@ -113,7 +116,7 @@ def prepare_macro_save(saved,working,folder,scope='storage-fix'):
     root=parent.parent.parent
     old={macro_key(m):m for m in original.macros}
     needs_dictionary=scope=='storage-fix' or any(
-        a.display!=b.display and (b'\xfd' in bytes.fromhex(a.raw_hex) or b'\xfd' in bytes.fromhex(b.raw_hex))
+        text_value(a)!=text_value(b) and (a.tokens or b.tokens or b'\xfd' in bytes.fromhex(a.raw_hex) or b'\xfd' in bytes.fromhex(b.raw_hex))
         for m in edited.macros for a,b in zip(old[macro_key(m)].lines,m.lines))
     reader=LocalReader(root);phrases=reader.load_phrases() if needs_dictionary else {}
     resolver=lambda token:resolve_token(token,phrases,saved.items)
@@ -131,21 +134,21 @@ def prepare_macro_save(saved,working,folder,scope='storage-fix'):
         fields=list(enumerate(zip(before.lines,macro.lines),1))
         if scope=='all':fields.insert(0,(0,(before.title,macro.title)))
         for n,(a,b) in fields:
-            if a.display==b.display:continue
+            if text_value(a)==text_value(b):continue
             if scope=='storage-fix':
                 ref=refs.get((key,n))
-                if ref is None or ref.replacement is None or ref.replacement!=b.display:
+                if ref is None or ref.replacement is None or text_value(remap_text(a,ref.replacement))!=text_value(b):
                     deferred.append(DeferredChange(address+f' / {n}行目','手編集した行は「マクロの編集をゲームに保存」から保存できます。'));continue
             try:
                 raw=bytes.fromhex(a.raw_hex)
                 provenance=bytes.fromhex(b.raw_hex) if scope=='all' and n else b''
                 replacement=(patch_line(raw,a.display,b.display,resolver) if scope=='storage-fix' else
-                    patch_text(raw,a.display,b.display,resolver,title=n==0,provenance=provenance))
+                    patch_text(raw,a.display,b.display,resolver,title=n==0,provenance=provenance,tokens=b.tokens))
             except ValueError as exc:
                 label='名前' if n==0 else f'{n}行目'
                 raise ValueError(f'{address} / {label}: {exc}') from exc
             page=(macro.book-1)*10+macro.palette-1
-            grouped.setdefault(page,[]).append(LineChange(key,n,a.display,b.display,raw,replacement,provenance))
+            grouped.setdefault(page,[]).append(LineChange(key,n,a.display,b.display,raw,replacement,provenance,b.tokens,a.tokens))
     if not grouped:raise ValueError('保存できるマクロの変更がありません。'+('\n'+deferred_text(deferred) if deferred else ''))
     files=[]
     for page,changes in sorted(grouped.items()):
@@ -186,12 +189,14 @@ def execute_macro_save(plan,backup_root):
         changes={(change.address,change.line):change for f in plan.files for change in f.changes}
         def changed(m,n,old):
             change=changes.get((macro_key(m),n))
-            return Text(change.after,change.provenance.hex(),'draft') if change else old
+            return Text(change.after,change.provenance.hex(),'draft',change.tokens) if change else old
         character.macros=[replace(m,title=changed(m,0,m.title),lines=tuple(changed(m,n,line) for n,line in enumerate(m.lines,1))) for m in character.macros]
         verified=prepare_macro_save(fresh,proposed,plan.character,plan.scope)
         if verified.files!=plan.files or verified.dependencies!=plan.dependencies:raise ValueError('保存計画が現在のマクロ変更と一致しません。')
     return execute_batch(plan,backup_root,root,validate,macros,'macro-edit' if plan.scope=='all' else 'macro-storage-fix','.ff11-macro-',
-                         lambda c:{'address':c.address,'line':c.line,'before':c.before,'after':c.after},
+                         lambda c:{'address':c.address,'line':c.line,'before':c.before,'after':c.after,
+                                   'before_token_ids':[t.identity for t in c.original_tokens or ()],
+                                   'after_token_ids':[t.identity for t in c.tokens or ()]},
                          require_game_closed,write_json,atomic_replace)
 
 

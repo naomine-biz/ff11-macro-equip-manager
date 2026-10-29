@@ -1,7 +1,7 @@
 """Pure binary decoders. Unknown bytes retained; never encodes or writes DATs."""
 import hashlib
 import struct
-from .domain import Text, Macro, Slot, Equipset, InventoryRow
+from .domain import Text, TextToken, Macro, Slot, Equipset, InventoryRow
 
 SLOTS = 'main sub range ammo head body hands legs feet neck waist ear1 ear2 ring1 ring2 back'.split()
 BAGS = {'is.dat':0,'bs.dat':1,'cl.dat':2,'ti.dat':3,'mb.dat':4,
@@ -12,7 +12,7 @@ DAT_IDS = [4,5,8,7,6,9,0xD8FB,0xD8FC,0xD8FF,0xD8FD]
 
 def text(raw, resolver=None):
     # Tokens can themselves contain zero bytes: split tokens before NUL handling.
-    parts=[]; pending=bytearray(); partial=False; i=0
+    parts=[]; pending=bytearray(); partial=False; i=0; tokens=[]
     def flush():
         nonlocal partial
         b=bytes(pending); pending.clear()
@@ -23,12 +23,14 @@ def text(raw, resolver=None):
         if raw[i]==0: break
         if raw[i]==0xFD and i+5<len(raw) and raw[i+5]==0xFD:
             flush(); name=resolver(raw[i+1:i+5]) if resolver else None
-            parts.append('【'+name+'】' if name else '{AT:'+raw[i+1:i+5].hex().upper()+'}')
+            label='【'+name+'】' if name else '{AT:'+raw[i+1:i+5].hex().upper()+'}'
+            start=sum(map(len,parts));tokens.append(TextToken(start,start+len(label),raw[i+1:i+5].hex().upper()))
+            parts.append(label)
             if not name: partial=True
             i+=6
         else: pending.append(raw[i]); i+=1
     flush()
-    return Text(''.join(parts), raw.hex(), 'partial' if partial else 'cp932')
+    return Text(''.join(parts), raw.hex(), 'partial' if partial else 'cp932',tuple(tokens) or None)
 
 
 def checked(data, size):

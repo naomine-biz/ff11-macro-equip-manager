@@ -1,6 +1,7 @@
 """Strict macro-field encoding with original auto-translate token identities."""
 import re
 from .codecs import text
+from .item_tokens import is_item_identity
 
 TOKEN_DISPLAY = re.compile(r'【[^【】]*】|\{AT:[0-9A-Fa-f]{8}\}',re.IGNORECASE)
 
@@ -25,16 +26,57 @@ def segments(raw, resolver):
     return parts
 
 
-def patch_text(raw, before, after, resolver, *, title=False, provenance=b''):
+def hydrate_text(value,resolver):
+    if value.tokens is not None or not value.raw_hex:return value
+    from .text_editing import remap_text
+    try:
+        decoded=text(bytes.fromhex(value.raw_hex),resolver)
+        if not decoded.tokens:return value
+        return remap_text(decoded,value.display)
+    except ValueError:return value
+
+
+def patch_text(raw, before, after, resolver, *, title=False, provenance=b'', tokens=None):
     width,limit=(10,8) if title else (61,60)
     if len(raw)!=width:raise ValueError('マクロ文字列の保存領域が不正です。')
     if any(c in after for c in ('\r','\n','\0')):raise ValueError('改行・NULを保存できません。')
     if text(raw,None if title else resolver).display!=before:raise ValueError('元の文字列と表示が一致しません。')
-    if before==after:return raw
+    if before==after and tokens is None:return raw
     try:
         if title:
             if TOKEN_DISPLAY.search(after):raise ValueError('マクロ名への定型文入力は未対応です。')
             payload=after.encode('cp932',errors='strict')
+        elif tokens is not None:
+            from .domain import Text
+            from .text_editing import validate_tokens
+            validate_tokens(Text(after,'','draft',tokens))
+            original_parts=segments(provenance or raw,resolver)
+            known={encoded[1:5].hex().upper() for _,encoded,is_token in original_parts if is_token}
+            original_plain=''.join(display for display,_,is_token in original_parts if not is_token)
+            new_plain=[]
+            pieces=[];last=0
+            for token in tokens:
+                plain=after[last:token.start]
+                new_plain.append(plain)
+                pieces.append(plain.encode('cp932',errors='strict'))
+                identity=bytes.fromhex(token.identity);name=resolver(identity)
+                label=after[token.start:token.end]
+                expected='【'+name+'】' if name else '{AT:'+token.identity+'}'
+                if label!=expected:raise ValueError('定型文のIDと名称が一致しません。')
+                if token.identity not in known and not (name and ((identity[0]==2 and identity[1]==1 and identity[3]!=0) or is_item_identity(identity))):
+                    raise ValueError('このIDは新規挿入できる定型文ではありません。')
+                pieces.append(b'\xfd'+identity+b'\xfd');last=token.end
+            plain=after[last:]
+            new_plain.append(plain)
+            from collections import Counter
+            literals=''.join(new_plain)
+            if Counter(TOKEN_DISPLAY.findall(literals))-Counter(TOKEN_DISPLAY.findall(original_plain)):
+                raise ValueError('定型文はTabキーから選択してください。')
+            for marker in ('【','】','{at:'):
+                if TOKEN_DISPLAY.sub('',literals).lower().count(marker)>TOKEN_DISPLAY.sub('',original_plain).lower().count(marker):
+                    raise ValueError('定型文表記が途中で切れています。')
+            pieces.append(plain.encode('cp932',errors='strict'))
+            payload=b''.join(pieces)
         else:
             source=provenance or raw
             if len(source)!=width:raise ValueError('編集元の文字列の保存領域が不正です。')

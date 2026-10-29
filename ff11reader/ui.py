@@ -3,9 +3,10 @@ from collections import Counter
 from contextlib import contextmanager
 from datetime import datetime
 import tkinter as tk
-from tkinter import ttk, simpledialog, messagebox
+from tkinter import ttk
+from . import dialogs
 from .application import set_character_label, preview_reference_fixes
-from .presentation import present_slot
+from .presentation import present_slot, format_token_ids
 from .macro_links import is_empty
 from .edit_application import Editor
 from .editing import plan_macro_fixes, macro_key
@@ -144,7 +145,7 @@ class ReaderWindow:
    self.character_choice.current(next((i for i,c in enumerate(snapshot.characters) if c.equipment_references),0));self.change_character()
   else:self.show_detail('キャラクターなし','読み取れたキャラクターフォルダはありません。')
   self.update_edit_status()
-  if self.editor.blocked:self.app.after_idle(lambda:messagebox.showwarning('作業再開の確認',self.editor.blocked,parent=self.app))
+  if self.editor.blocked:dialogs.when_visible(self.app,lambda:dialogs.showwarning('作業再開の確認',self.editor.blocked,parent=self.app))
 
  @property
  def character(self):
@@ -165,10 +166,10 @@ class ReaderWindow:
   return self.photos[item]
  def rename(self):
   if not self.character:return
-  name=simpledialog.askstring('表示名を登録','アプリ専用の表示名（空欄で解除）',initialvalue=self.character.display_name or '',parent=self.app)
+  name=dialogs.askstring('表示名を登録','アプリ専用の表示名（空欄で解除）',initialvalue=self.character.display_name or '',parent=self.app)
   if name is None:return
   try:set_character_label(self.snapshot,self.character,name)
-  except (ValueError,OSError) as e:messagebox.showerror('保存できません',str(e));return
+  except (ValueError,OSError) as e:dialogs.showerror('保存できません',str(e),parent=self.app);return
   i=self.character_choice.current();self.character_choice.configure(values=self.character_labels());self.character_choice.current(i)
  def preview_fixes(self):
   c=self.character
@@ -189,7 +190,7 @@ class ReaderWindow:
   text.configure(state='disabled')
   def apply():
    try:self.run_edit(lambda:self.editor.equipment_fixes(c.folder_id,plan))
-   except (ValueError,OSError) as e:messagebox.showerror('適用できません',str(e),parent=window);return
+   except (ValueError,OSError) as e:dialogs.showerror('適用できません',str(e),parent=window);return
    window.destroy()
    self.footer.configure(text=f'アプリ内の作業データに {len(plan.changes)}枠のFixを適用しました。')
   ttk.Button(window,text='この案をアプリ内に適用（ゲームへの保存なし）',command=apply,state='normal' if plan.changes else 'disabled').pack(side='right',padx=12,pady=12)
@@ -220,18 +221,18 @@ class ReaderWindow:
    self.refresh_edits()
  def undo_fix(self):
   try:self.run_edit(self.editor.undo)
-  except (OSError,ValueError) as e:messagebox.showerror('Undo',str(e),parent=self.app);return
+  except (OSError,ValueError) as e:dialogs.showerror('Undo',str(e),parent=self.app);return
  def redo_edit(self):
   try:self.run_edit(self.editor.redo)
-  except (OSError,ValueError) as e:messagebox.showerror('Redo',str(e),parent=self.app);return
+  except (OSError,ValueError) as e:dialogs.showerror('Redo',str(e),parent=self.app);return
  def reset_edits(self):
-  if not messagebox.askyesno('編集をリセット','現在の作業ファイルを保管し、読込時の状態から編集を開始しますか？',parent=self.app):return
+  if not dialogs.askyesno('編集をリセット','現在の作業ファイルを保管し、読込時の状態から編集を開始しますか？',parent=self.app,accept_label='保管してリセット'):return
   try:self.run_edit(self.editor.start_fresh)
-  except (OSError,ValueError) as e:messagebox.showerror('リセット',str(e),parent=self.app);return
+  except (OSError,ValueError) as e:dialogs.showerror('リセット',str(e),parent=self.app);return
  def preview_game_save(self,scope='storage-fix'):
   if not self.character:return
   try:plan=self.editor.prepare_macro_save(self.character.folder_id,scope)
-  except (OSError,ValueError,RuntimeError) as e:messagebox.showerror('保存プレビュー',str(e),parent=self.app);return
+  except (OSError,ValueError,RuntimeError) as e:dialogs.showerror('保存プレビュー',str(e),parent=self.app);return
   window=tk.Toplevel(self.app,background='#080f22');window.title('マクロの編集 / ゲームへの保存' if scope=='all' else 'マクロ収納番号Fix / ゲームへの保存');window.geometry('980x680')
   count=sum(len(f.changes) for f in plan.files)
   ttk.Label(window,text=f'{self.character.display_name or self.character.folder_id} · {count}項目 / {len(plan.files)}ファイル · 保留 {plan.deferred}件（詳細は下記）',padding=10).pack(anchor='w')
@@ -244,6 +245,7 @@ class ReaderWindow:
     b,p,bank,key=change.address
     field='名前' if change.line==0 else f'{change.line}行目'
     text.insert('end',f'ブック {b:02} / パレット {p} / {bank.upper()} {key if key<10 else 0} / {field}\n  前: {change.before}\n  後: {change.after}\n\n')
+    if change.before==change.after:text.insert('end',f'定型文ID: {format_token_ids(change.original_tokens)} → {format_token_ids(change.tokens)}\n\n')
   if plan.deferred_changes:
    text.insert('end','作業データに残す変更\n')
    for change in plan.deferred_changes:text.insert('end',f'{change.target}: {change.reason}\n')
@@ -252,13 +254,13 @@ class ReaderWindow:
    button.configure(state='disabled');window.update_idletasks()
    try:backup=self.editor.save_macros(plan,Path(__file__).resolve().parent.parent/'backups'/'macros')
    except (OSError,ValueError,RuntimeError) as e:
-    self.update_edit_status();messagebox.showerror('ゲームへの保存',str(e),parent=window);button.configure(state='normal');return
+    self.update_edit_status();dialogs.showerror('ゲームへの保存',str(e),parent=window);button.configure(state='normal');return
    window.destroy();self.refresh_edits();self.footer.configure(text=f'{count}項目を保存・検証しました。バックアップ: {backup}')
   button=ttk.Button(window,text=f'バックアップして{count}項目をゲームに保存',command=save);button.pack(pady=12)
  def preview_equipment_save(self):
   if not self.character:return
   try:plan=self.editor.prepare_equipment_save(self.character.folder_id)
-  except (OSError,ValueError,RuntimeError) as e:messagebox.showerror('保存プレビュー',str(e),parent=self.app);return
+  except (OSError,ValueError,RuntimeError) as e:dialogs.showerror('保存プレビュー',str(e),parent=self.app);return
   window=tk.Toplevel(self.app,background='#080f22');window.title('装備セットの補正 / ゲームへの保存');window.geometry('980x680')
   count=sum(len(f.changes) for f in plan.files)
   ttk.Label(window,text=f'{self.character.display_name or self.character.folder_id} · {count}枠 / {len(plan.files)}ファイル · 保留 {plan.deferred}件（詳細は下記）',padding=10).pack(anchor='w')
@@ -277,7 +279,7 @@ class ReaderWindow:
    button.configure(state='disabled');window.update_idletasks()
    try:backup=self.editor.save_equipment(plan,Path(__file__).resolve().parent.parent/'backups'/'equipment')
    except (OSError,ValueError,RuntimeError) as e:
-    self.update_edit_status();messagebox.showerror('ゲームへの保存',str(e),parent=window);button.configure(state='normal');return
+    self.update_edit_status();dialogs.showerror('ゲームへの保存',str(e),parent=window);button.configure(state='normal');return
    window.destroy();self.refresh_edits();self.footer.configure(text=f'{count}枠を保存・検証しました。バックアップ: {backup}')
   button=ttk.Button(window,text=f'バックアップして{count}枠をゲームに保存',command=save);button.pack(pady=12)
  def change_character(self,event=None):self.change_mode()
@@ -472,15 +474,20 @@ class ReaderWindow:
   c=self.character;macro=next(m for m in c.macros if macro_key(m)==self.active_macro)
   window=tk.Toplevel(self.app,background='#080f22');window.title('マクロを編集');window.geometry('800x400')
   ttk.Label(window,text=f'ブック {macro.book:02} / パレット {macro.palette} / {macro.bank.upper()} {macro.key if macro.key<10 else 0}',padding=10).pack(anchor='w')
-  ttk.Label(window,text='保存上限: 名前8バイト・各行60バイト（CP932）。既存の定型文は括弧ごと保持します。',padding=(10,0,10,4)).pack(anchor='w')
+  ttk.Label(window,text='保存上限: 名前8バイト・各行60バイト（CP932）。行でTab: 定型文を検索。Shift+Tab: 前の入力欄へ。',padding=(10,0,10,4)).pack(anchor='w')
+  from .phrases import PhraseCatalog
+  from .phrase_ui import PhraseEntry
+  catalog=PhraseCatalog(self.snapshot.phrases,self.snapshot.phrase_readings,self.snapshot.items)
+  controllers=[]
   entries=[]
   for label,value in [('名前',macro.title.display)]+[(f'{i}行目',line.display) for i,line in enumerate(macro.lines,1)]:
    row=ttk.Frame(window);row.pack(fill='x',padx=12,pady=4)
    ttk.Label(row,text=label,width=8).pack(side='left')
    entry=tk.Entry(row,bg='#101b38',fg='#edf1fa',insertbackground='white');entry.insert(0,value);entry.pack(side='left',fill='x',expand=True);entries.append(entry)
+   if len(entries)>1:controllers.append(PhraseEntry(entry,macro.lines[len(entries)-2],catalog))
   def preview():
-   try:edit=self.editor.prepare_macro_edit(c.folder_id,macro_key(macro),entries[0].get(),[e.get() for e in entries[1:]])
-   except ValueError as e:messagebox.showerror('入力内容',str(e),parent=window);return
+   try:edit=self.editor.prepare_macro_edit(c.folder_id,macro_key(macro),entries[0].get(),[c.value for c in controllers])
+   except ValueError as e:dialogs.showerror('入力内容',str(e),parent=window);return
    self.preview_edit(edit,lambda:self.editor.apply(edit),window)
   ttk.Button(window,text='変更案を確認',command=preview).pack(pady=12)
  def preview_edit(self,edit,apply,parent=None):
@@ -495,13 +502,15 @@ class ReaderWindow:
    text.insert('end',f'ブック {b:02} / パレット {p} / {bank.upper()} {key if key<10 else 0}  {change.before.title.display}\n')
    if change.before.title!=change.after.title:text.insert('end',f'名前: {change.before.title.display} → {change.after.title.display}\n')
    for n,(before,after) in enumerate(zip(change.before.lines,change.after.lines),1):
-    if before!=after:text.insert('end',f'{n}行目\n  前: {before.display}\n  後: {after.display}\n')
+    if before!=after:
+     text.insert('end',f'{n}行目\n  前: {before.display}\n  後: {after.display}\n')
+     if before.display==after.display:text.insert('end',f'定型文ID: {format_token_ids(before.tokens)} → {format_token_ids(after.tokens)}\n')
    text.insert('end','\n')
   if not count:text.insert('end','変更対象なし')
   text.configure(state='disabled')
   def commit():
    try:self.run_edit(apply)
-   except (ValueError,OSError) as e:messagebox.showerror('作業保存',str(e),parent=window);return
+   except (ValueError,OSError) as e:dialogs.showerror('作業保存',str(e),parent=window);return
    window.destroy()
    if parent and parent.winfo_exists():parent.destroy()
   ttk.Button(window,text=f'{count}マクロの変更を作業データに適用',command=commit,state='normal' if count and not self.editor.blocked else 'disabled').pack(pady=12)

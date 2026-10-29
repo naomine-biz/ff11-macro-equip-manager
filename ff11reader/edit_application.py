@@ -121,7 +121,7 @@ class Editor:
         from .domain import Text
         def changed(m,n,old):
             change=changes.get((macro_key(m),n))
-            return Text(change.after,change.replacement.hex(),'cp932') if change else old
+            return Text(change.after,change.replacement.hex(),'cp932',change.tokens) if change else old
         character.macros=[replace(m,title=changed(m,0,m.title),lines=tuple(changed(m,n,line) for n,line in enumerate(m.lines,1))) for m in character.macros]
         next_session.saved=saved
         return self._save_checkpoint(preview,backup_root,next_session,execute_macro_save)

@@ -1,6 +1,6 @@
 # 要件と実装・検証の対応
 
-本書は対応を探すための索引。要求は[requirements.md](../requirements.md)、内部の制約は[設計条件](design-constraints.md)を参照する。2026-10-28時点。テスト欄は存在を確認した代表テストであり、要件全体の網羅や今回の実行結果を表さない。将来要件に記載したモジュールは関連する既存基盤を示す。
+本書は対応を探すための索引。要求は[requirements.md](../requirements.md)、内部の制約は[設計条件](design-constraints.md)を参照する。2026-10-29時点。テスト欄は存在を確認した代表テストであり、要件全体の網羅や今回の実行結果を表さない。将来要件に記載したモジュールは関連する既存基盤を示す。
 
 合成データのテストを通常の検証に使う。`tests/test_ui.py`の実ゲーム読込を伴う検証は別扱いとし、今回実行していない。視覚品質・手動確認・未実装の不足は下表に残す。
 
@@ -28,15 +28,16 @@
 | [EDIT-004](../requirements.md#edit-004) | [draft_store.py](../ff11reader/draft_store.py)、[edit_application.py](../ff11reader/edit_application.py) | [EditingTests.test_persistence_redo_conflict_and_failed_save](../tests/test_editing.py) | 保存失敗・再開・競合を検証 |
 | [EDIT-005](../requirements.md#edit-005) | [draft_store.py](../ff11reader/draft_store.py)、[edit_application.py](../ff11reader/edit_application.py) | [EditingTests.test_corrupt_draft_is_preserved](../tests/test_editing.py) | 破損保護の部分検証。外部更新から再読込する全手順の専用検証は不足 |
 | [EDIT-006](../requirements.md#edit-006) | [editing.py](../ff11reader/editing.py)、[edit_application.py](../ff11reader/edit_application.py)、[ui.py](../ff11reader/ui.py) | [EditingUITests.test_edit_preview_undo_redo_fix_and_reopen](../tests/test_editing_ui.py) | マクロ編集を検証。装備セットの個別編集UIは未実装 |
+| [EDIT-007](../requirements.md#edit-007) | [phrases.py](../ff11reader/phrases.py)、[text_editing.py](../ff11reader/text_editing.py)、[phrase_ui.py](../ff11reader/phrase_ui.py)、[macro_text.py](../ff11reader/macro_text.py) | [test_phrase_editing.py](../tests/test_phrase_editing.py) | 通常定型文の全体検索・表記揺れ・距離1、同名ID変更、旧作業互換、合成保存、キーボードUI。日本語IMEとゲーム内は確認待ち |
 | [SAVE-001](../requirements.md#save-001) | [save_plan.py](../ff11reader/save_plan.py)、[macro_saving.py](../ff11reader/macro_saving.py)、[equipment_saving.py](../ff11reader/equipment_saving.py)、[ui.py](../ff11reader/ui.py) | [MacroSavingTests.test_unrelated_manual_edits_are_retained](../tests/test_macro_saving.py) | Fix限定保存と保留に加え、[test_manual_macro_saving.py](../tests/test_manual_macro_saving.py)で名前・各行の一般保存を検証 |
 | [SAVE-002](../requirements.md#save-002) | [macro_saving.py](../ff11reader/macro_saving.py)、[equipment_saving.py](../ff11reader/equipment_saving.py)、[file_transaction.py](../ff11reader/file_transaction.py) | [MacroSavingTests.test_stale_macro_inventory_and_plan_tamper_rejected](../tests/test_macro_saving.py) | マクロの競合を検証。装備保存にも同等テストあり |
 | [SAVE-003](../requirements.md#save-003) | [file_transaction.py](../ff11reader/file_transaction.py) | [EquipmentSavingTests.test_candidate_changes_and_staging_failure](../tests/test_equipment_saving.py) | 装備保存の準備失敗を検証 |
-| [SAVE-004](../requirements.md#save-004) | [macro_saving.py](../ff11reader/macro_saving.py)、[saving.py](../ff11reader/saving.py)、[codecs.py](../ff11reader/codecs.py) | [MacroSavingTests.test_token_zero_bytes_japanese_padding_and_length_limit](../tests/test_macro_saving.py) | [macro_text.py](../ff11reader/macro_text.py)で手編集のCP932・上限・既存定型文保持も検証。新規定型文の選択UIは未実装 |
+| [SAVE-004](../requirements.md#save-004) | [macro_saving.py](../ff11reader/macro_saving.py)、[saving.py](../ff11reader/saving.py)、[codecs.py](../ff11reader/codecs.py) | [MacroSavingTests.test_token_zero_bytes_japanese_padding_and_length_limit](../tests/test_macro_saving.py) | [macro_text.py](../ff11reader/macro_text.py)で手編集のCP932・上限・既存定型文保持も検証。通常定型文の検索・挿入とID保持を追加。IMEとゲーム内の新規挿入は実機確認待ち |
 | [SAVE-005](../requirements.md#save-005) | [file_transaction.py](../ff11reader/file_transaction.py)、[edit_application.py](../ff11reader/edit_application.py) | [EquipmentSavingTests.test_failed_rollback_keeps_pending_and_blocks_edits](../tests/test_equipment_saving.py) | 復旧待ちを検証。外部更新は復元テストも参照 |
 | [SAVE-006](../requirements.md#save-006) | [edit_application.py](../ff11reader/edit_application.py)、[draft_store.py](../ff11reader/draft_store.py) | [MacroSavingTests.test_draft_checkpoint_failure_recovers_on_restart](../tests/test_macro_saving.py) | 同期失敗を検証。保存後Undoは保存テストでも検証 |
 | [VIEW-001](../requirements.md#view-001) | [ui.py](../ff11reader/ui.py) | — | 専用自動テストなし。画面で確認する |
 | [VIEW-002](../requirements.md#view-002) | [ui.py](../ff11reader/ui.py)、[presentation.py](../ff11reader/presentation.py) | [PresentationTests.test_four_main_actions](../tests/test_presentation.py) | 状態表示の分類を検証。視覚品質は手動確認 |
-| [VIEW-003](../requirements.md#view-003) | [ui.py](../ff11reader/ui.py) | — | 専用自動テストなし。繰返し操作と視認で確認する |
+| [VIEW-003](../requirements.md#view-003) | [ui.py](../ff11reader/ui.py)、[dialogs.py](../ff11reader/dialogs.py) | [test_dialogs.py](../tests/test_dialogs.py) | 親画面内モーダル、取消・入力、フォーカスとgrabの復帰、長文、起動時の表示を合成Tkで検証。Computer Useによる取得は実機確認待ち |
 | [WARD-001](../requirements.md#ward-001) | [wardrobe_usage.py](../ff11reader/wardrobe_usage.py) | [WardrobeUsageTests.test_scope_and_both_reference_sources](../tests/test_wardrobe_usage.py) | 参照元と対象収納を検証 |
 | [WARD-002](../requirements.md#ward-002) | [wardrobe_usage.py](../ff11reader/wardrobe_usage.py) | [WardrobeUsageTests.test_edit_and_undo_recompute_without_cross_character_references](../tests/test_wardrobe_usage.py) | 再計算とキャラ分離を検証 |
 | [FUT-001](../requirements.md#fut-001) | [editing.py](../ff11reader/editing.py)、[save_plan.py](../ff11reader/save_plan.py) | — | 未実装。衝突・上書き・入替えの規則は着手前に確定する |
@@ -239,3 +240,39 @@ SAVE-001/004/006、EX-S15、EX-MS01〜07、PT-23/24に対応。`macro_text.py`�
 画面の「マクロの編集をゲームに保存…」から、選択キャラの名前・行の変更をプレビューする。定型文の新規挿入・選択UIは未実装。既存の括弧付き表示を維持して周囲を編集する、定型文を削除する、Undoで戻す操作を扱う。同表示の異ID・通常文字との衝突・元にない定型文表記はエラーにする。
 
 検証: 全体146件中139件成功、GUI関連7件スキップ。その後、空への変更と未知トークンを含む未変更行の保持を追加し、合成GUIを含む関連25件が成功。通常文字・CP932境界・トークン内部ゼロ・未解決ID・曖昧性・再開・削除後Undo保存・2ファイル途中失敗・作業同期失敗を検証した。6seedの名前/6行編集は固定オフセットで独立に組み立てた期待バイトと照合した。実データへの書込みは行っていない。
+
+
+## 2026-10-29 定型文入力の検証
+
+- 全体回帰: 155件、147件成功・8件スキップ。その後追加したケースと修正箇所は下記の対象テストで再検証。
+- `test_phrase_editing`、`test_editing`、`test_macro_saving`、`test_manual_macro_saving`: 43件、38件成功・5件スキップ。
+- `FF11_RUN_INTEGRATION=1`で`test_phrase_editing`、`test_editing_ui`、`test_manual_macro_saving`: 22件成功。Tabから検索、候補選択、編集適用、保存プレビュー、合成ファイルへの保存・再開を確認。
+- 通常定型文の新規ID、同名ID置換、元バイトを持たない旧作業履歴の移行を検証。合成試験はファイルアクセスを隔離し、ゲームデータへの書込みは行っていない。
+- 日本語IMEの変換操作、実辞書での操作感、ゲーム内での新規定型文の動作確認は未実施。
+
+
+## 2026-10-29 アプリ内通知の検証
+
+`FF11_RUN_INTEGRATION=1`で`test_dialogs`、`test_editing_ui`、`test_phrase_editing`、`test_manual_macro_saving`を実行し29件成功。通知・確認・入力を共通の親画面内モーダルへ移行した。ゲームデータへの書込みは行っていない。
+
+
+## 起動時通知でメイン画面が未表示になる問題
+
+`after_idle`からモーダル待機を始めると、初回のウィンドウ表示が完了せず停止することを合成Tkで再現。修正前はmapped=0・viewable=0・1x1、初回Map後に通知する修正後はmapped=1・viewable=1・800x500を確認した。以前のテストは表示済みの画面を再表示していたため、この条件を検出できなかった。
+
+未表示から始める回帰テストへ変更し、`FF11_RUN_INTEGRATION=1`の`test_dialogs`と`test_editing_ui`計8件が成功。調査・検証でゲームデータへアクセスしていない。実データを使った再起動確認は未実施。
+
+
+## 共通ダイアログの本文量に応じたサイズ
+
+固定86%のパネルを、文字幅とTkが計測する折返し後の本文高さに合わせる方式へ変更。幅は最大720pxかつ親画面左右に余白を取り、高さは親画面の85%を上限とする。収まる本文ではスクロールバーを隠す。親画面のサイズ変更時に再計測する。
+
+`FF11_RUN_INTEGRATION=1`の`test_dialogs`と`test_editing_ui`計11件成功。短文・複数行・長い日本語・親画面縮小・起動通知・取消とフォーカス復帰を合成Tkで確認。ゲームデータへアクセスしていない。
+
+定型文の読み・カテゴリ検索（EDIT-007、D-09）: `dictionaries.auto_translate` → `LocalReader.phrase_readings` → `Snapshot.phrase_readings` → `PhraseCatalog`。検証は `tests/test_phrase_readings.py`（合成辞書の読み保持、かな・漢字検索、カテゴリ絞込み、Tabからの挿入・取消）。日本語IMEの実機操作は引き続き確認対象。
+
+カテゴリ階層（EDIT-007、D-09、EX-AT-09）: `phrase_categories.py` が名称・階層・順序、`PhraseCatalog` が絞込み、`PhraseEntry` が大分類→小分類のキー操作を担当。`tests/test_phrase_readings.py` で統合後のID保持・未知カテゴリ・表示順・全体検索への復帰を検証。
+
+アイテム定型文（EDIT-007、EX-AT-10）: `item_tokens.py`、`PhraseCatalog`、`macro_text.patch_text`。`tests/test_item_phrases.py` がID逆変換・検索・編集履歴・合成保存を検証。ゲーム内での新規アイテム定型文の動作確認は未実施。
+
+2026-10-29 実機確認: ユーザーがカテゴリ階層での選択、およびアイテム名の検索・挿入を確認。新規アイテム定型文のゲーム保存・ゲーム内確認は未実施。

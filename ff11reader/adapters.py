@@ -24,7 +24,7 @@ def discover():
 
 class LocalReader:
     def __init__(self, root):
-        self.root=Path(root).resolve(); self.sources=[]; self.diagnostics=[]
+        self.root=Path(root).resolve(); self.sources=[]; self.diagnostics=[]; self.phrase_readings={}
 
     def read(self,path):
         path=path.resolve()
@@ -62,7 +62,8 @@ class LocalReader:
             if logical*2+2>len(table): raise ValueError('Truncated FTABLE')
             packed=struct.unpack_from('<H',table,logical*2)[0]
             return self.guarded(self.root/'ROM'/str(packed>>7)/f'{packed&127}.DAT',decode) or {}
-        phrases=read_dat(0xD8F9,dictionaries.auto_translate)
+        self.phrase_readings={}
+        phrases=read_dat(0xD8F9,lambda data:dictionaries.auto_translate(data,self.phrase_readings))
         linked={key:read_dat(logical,dictionaries.dmsg_names)
                 for key,logical in {'A':0xD8EF,'C':0xD91E,'J':0xD8F0,'Y':0xD91D}.items()}
         for key,value in list(phrases.items()):

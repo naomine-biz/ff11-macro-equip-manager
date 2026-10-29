@@ -2,6 +2,8 @@
 from copy import deepcopy
 from dataclasses import dataclass, replace
 from .domain import Text
+from .text_editing import remap_text
+from .edit_values import validate_text
 from .edit_state import SnapshotState
 from .edit_values import value, character_value, validate_transition, key as edit_key
 from .macro_inventory import assess_macro_inventory
@@ -33,10 +35,12 @@ def contents(character):
 
 
 def edit_macro(character, macro, title, lines):
-    if len(lines) != 6 or any('\n' in s or '\r' in s or '\0' in s for s in [title, *lines]):
+    if len(lines) != 6 or any(not isinstance(s,(str,Text)) for s in [title,*lines]):
         raise ValueError('マクロは名前と6行で入力してください。')
     def text(before, value):
-        return before if before.display == value else Text(value, before.raw_hex, 'draft')
+        result=value if isinstance(value,Text) else remap_text(before,value)
+        validate_text(result)
+        return replace(result,raw_hex=before.raw_hex)
     updated = replace(macro, title=text(macro.title, title), lines=tuple(text(a, b) for a, b in zip(macro.lines, lines)))
     return Edit('マクロを編集', (Change(character.folder_id, 'macros', macro_key(macro), macro, updated),))
 
@@ -50,7 +54,7 @@ def plan_macro_fixes(character, items, address=None):
             continue
         fixes = {r.line: r.replacement for r in refs if r.address == key and r.replacement is not None}
         if fixes:
-            lines = tuple(Text(fixes[n], line.raw_hex, 'draft') if n in fixes else line for n, line in enumerate(macro.lines, 1))
+            lines = tuple(remap_text(line,fixes[n]) if n in fixes else line for n, line in enumerate(macro.lines, 1))
             changes.append(Change(character.folder_id, 'macros', key, macro, replace(macro, lines=lines)))
     return Edit('マクロの収納番号Fix', tuple(changes))
 

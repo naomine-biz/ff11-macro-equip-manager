@@ -1,5 +1,5 @@
 """Application draft persistence; all writes stay in the application work directory."""
-from dataclasses import fields, is_dataclass
+from dataclasses import fields, is_dataclass, replace
 import hashlib
 from .tracing import span
 import json
@@ -8,7 +8,7 @@ from pathlib import Path
 from uuid import uuid4
 from . import domain, editing
 
-TYPES = {cls.__name__: cls for cls in (domain.Text, domain.Macro, domain.Slot, domain.Equipset, domain.ItemReference, editing.Change, editing.Edit)}
+TYPES = {cls.__name__: cls for cls in (domain.TextToken, domain.Text, domain.Macro, domain.Slot, domain.Equipset, domain.ItemReference, editing.Change, editing.Edit)}
 
 
 def encode(value):
@@ -23,15 +23,27 @@ def encode(value):
     return value
 
 
-def decode(value):
+def decode(value, resolver=None):
     if isinstance(value, list):
-        return [decode(v) for v in value]
+        return [decode(v,resolver) for v in value]
     if isinstance(value, dict):
         if set(value) == {'type', 'fields'}:
-            return TYPES[value['type']](**{k: decode(v) for k, v in value['fields'].items()})
+            result=TYPES[value['type']](**{k: decode(v,resolver) for k, v in value['fields'].items()})
+            if isinstance(result,domain.Text) and resolver is not None:
+                from .macro_text import hydrate_text
+                result=hydrate_text(result,resolver)
+            if isinstance(result,editing.Change) and isinstance(result.before,domain.Macro) and isinstance(result.after,domain.Macro):
+                from .text_editing import remap_text
+                lines=[]
+                for before,after in zip(result.before.lines,result.after.lines):
+                    if after.tokens is None and not after.raw_hex and before.tokens:
+                        after=remap_text(before,after.display)
+                    lines.append(after)
+                result=replace(result,after=replace(result.after,lines=tuple(lines)))
+            return result
         if set(value) == {'tuple'}:
-            return tuple(decode(v) for v in value['tuple'])
-        return {k: decode(v) for k, v in value.items()}
+            return tuple(decode(v,resolver) for v in value['tuple'])
+        return {k: decode(v,resolver) for k, v in value.items()}
     return value
 
 
@@ -57,13 +69,15 @@ class DraftStore:
         data = json.loads(self.path.read_text(encoding='utf-8'))
         if data['version'] not in (1,2,3) or data['installation'] != snapshot.installation_key or data['sources'] != [list(v) for v in signature(snapshot)]:
             raise ValueError('ゲームの読込元が変わっています。以前の作業ファイルを保管して、新しい編集を開始できます。')
-        history = decode(data['history'])
+        from .dictionaries import resolve_token
+        resolver=lambda p:resolve_token(p,snapshot.phrases,snapshot.items)
+        history = decode(data['history'],resolver)
         initial = session.baseline
         if data['version'] == 3:
             # History may lose a saved operation after Undo followed by branching.
             # Keep its original values even for targets absent from the new history.
             from .edit_values import character_value, validate_structure
-            baseline = decode(data['baseline'])
+            baseline = decode(data['baseline'],resolver)
             if set(baseline) != {c.folder_id for c in initial.characters}:
                 raise ValueError('作業履歴の起点とキャラクターが一致しません。')
             for character in initial.characters:
