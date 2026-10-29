@@ -1,4 +1,5 @@
 """Seeded generators, independent fixtures, shrinking and synthetic I/O isolation."""
+from ff11reader import elevation  # Load save transport before the I/O isolation guard.
 from contextlib import contextmanager, ExitStack
 from contextvars import ContextVar
 from copy import deepcopy

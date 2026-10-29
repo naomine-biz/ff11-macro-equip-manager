@@ -108,7 +108,9 @@ class Modal:
 
     def wait(self):
         try:
-            self.parent.wait_window(self.layer)
+            from .ui_actions import input_wait
+            with input_wait(self.parent):
+                self.parent.wait_window(self.layer)
             return self.result
         finally:
             try:

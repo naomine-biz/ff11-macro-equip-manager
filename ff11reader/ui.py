@@ -1,10 +1,10 @@
 """Graphical workspace with explicit, guarded equipment reference saving."""
 from collections import Counter
-from contextlib import contextmanager
 from datetime import datetime
 import tkinter as tk
 from tkinter import ttk
 from . import dialogs
+from .ui_actions import ActionButton
 from .application import set_character_label, preview_reference_fixes
 from .presentation import present_slot, format_token_ids
 from .macro_links import is_empty
@@ -14,25 +14,6 @@ from .macro_inventory import assess_macro_inventory, LABELS as MACRO_ITEM_LABELS
 from .application import inspect_macro_set_links, inspect_wardrobe_usage
 from pathlib import Path
 from .tracing import configure, traced
-
-
-@contextmanager
-def waiting_cursor(root):
- """Keep temporary busy feedback in the UI; preserve each widget's cursor."""
- cursors=[]
- def visit(widget):
-  if 'cursor' in widget.keys():
-   cursors.append((widget,widget.cget('cursor')))
-   widget.configure(cursor='wait')
-  for child in widget.winfo_children():visit(child)
- try:
-  visit(root)
-  root.update_idletasks()
-  yield
- finally:
-  for widget,cursor in reversed(cursors):
-   if widget.winfo_exists():widget.configure(cursor=cursor)
-  root.update_idletasks()
 
 
 ACTION_STYLE = {
@@ -116,17 +97,17 @@ class ReaderWindow:
   self.canvas.bind('<Configure>',lambda e:self.canvas.itemconfigure(self.canvas_window,width=e.width))
   self.canvas.bind('<MouseWheel>',lambda e:self.canvas.yview_scroll(-int(e.delta/120),'units'))
   ttk.Button(right,text='マクロと装備セットの参照確認',command=self.show_macro_links).pack(fill='x',pady=(0,6))
-  ttk.Button(right,text='装備セットの参照位置を補正',command=self.preview_fixes).pack(fill='x',pady=(0,6))
+  ActionButton(right,busy=True,text='装備セットの参照位置を補正',command=self.preview_fixes).pack(fill='x',pady=(0,6))
   ttk.Button(right,text='マクロの収納番号を確認・補正',command=self.show_macro_inventory).pack(fill='x',pady=(0,6))
   ttk.Button(right,text='ワードローブの未参照アイテム',command=self.show_unused_wardrobe).pack(fill='x',pady=(0,6))
-  self.edit_button=ttk.Button(right,text='選択マクロを編集',command=self.edit_selected_macro,state='disabled');self.edit_button.pack(fill='x',pady=(0,6))
+  self.edit_button=ActionButton(right,busy=True,text='選択マクロを編集',command=self.edit_selected_macro,state='disabled');self.edit_button.pack(fill='x',pady=(0,6))
   history=ttk.Frame(right);history.pack(fill='x',pady=(0,6))
-  self.undo_button=ttk.Button(history,text='Undo',command=self.undo_fix);self.undo_button.pack(side='left',expand=True,fill='x')
-  self.redo_button=ttk.Button(history,text='Redo',command=self.redo_edit);self.redo_button.pack(side='left',expand=True,fill='x')
+  self.undo_button=ActionButton(history,busy=True,text='Undo',command=self.undo_fix);self.undo_button.pack(side='left',expand=True,fill='x')
+  self.redo_button=ActionButton(history,busy=True,text='Redo',command=self.redo_edit);self.redo_button.pack(side='left',expand=True,fill='x')
   self.draft_label=ttk.Label(right,text='');self.draft_label.pack(fill='x')
-  ttk.Button(right,text='装備セットの補正をゲームに保存…',command=self.preview_equipment_save).pack(fill='x',pady=(0,6))
-  ttk.Button(right,text='マクロの編集をゲームに保存…',command=lambda:self.preview_game_save('all')).pack(fill='x',pady=(0,6))
-  ttk.Button(right,text='作業ファイルを保管して編集をリセット',command=self.reset_edits).pack(fill='x',pady=(0,6))
+  ActionButton(right,busy=True,text='装備セットの補正をゲームに保存…',command=self.preview_equipment_save).pack(fill='x',pady=(0,6))
+  ActionButton(right,busy=True,text='マクロの編集をゲームに保存…',command=lambda:self.preview_game_save('all')).pack(fill='x',pady=(0,6))
+  ActionButton(right,busy=True,text='作業ファイルを保管して編集をリセット',command=self.reset_edits).pack(fill='x',pady=(0,6))
   ttk.Label(right,text='Item / Help',font=('MS Gothic',14,'bold')).pack(anchor='w',pady=(0,12))
   self.detail=tk.Text(right,width=38,wrap='word',font=('MS Gothic',10),bg='#101b38',fg='#edf1fa',insertbackground='white',selectbackground='#354b7a',relief='sunken',borderwidth=1,padx=12,pady=12,state='disabled')
   self.detail.pack(fill='both',expand=True)
@@ -193,7 +174,7 @@ class ReaderWindow:
    except (ValueError,OSError) as e:dialogs.showerror('適用できません',str(e),parent=window);return
    window.destroy()
    self.footer.configure(text=f'アプリ内の作業データに {len(plan.changes)}枠のFixを適用しました。')
-  ttk.Button(window,text='この案をアプリ内に適用（ゲームへの保存なし）',command=apply,state='normal' if plan.changes else 'disabled').pack(side='right',padx=12,pady=12)
+  ActionButton(window,busy=True,text='この案をアプリ内に適用（ゲームへの保存なし）',command=apply,state='normal' if plan.changes else 'disabled').pack(side='right',padx=12,pady=12)
   ttk.Button(window,text='閉じる',command=window.destroy).pack(side='right',pady=12)
  @traced('ui.update_edit_status')
  def update_edit_status(self):
@@ -216,9 +197,8 @@ class ReaderWindow:
   self.update_edit_status()
  @traced('ui.run_edit')
  def run_edit(self,operation):
-  with waiting_cursor(self.app):
-   operation()
-   self.refresh_edits()
+  operation()
+  self.refresh_edits()
  def undo_fix(self):
   try:self.run_edit(self.editor.undo)
   except (OSError,ValueError) as e:dialogs.showerror('Undo',str(e),parent=self.app);return
@@ -256,7 +236,7 @@ class ReaderWindow:
    except (OSError,ValueError,RuntimeError) as e:
     self.update_edit_status();dialogs.showerror('ゲームへの保存',str(e),parent=window);button.configure(state='normal');return
    window.destroy();self.refresh_edits();self.footer.configure(text=f'{count}項目を保存・検証しました。バックアップ: {backup}')
-  button=ttk.Button(window,text=f'バックアップして{count}項目をゲームに保存',command=save);button.pack(pady=12)
+  button=ActionButton(window,busy=True,text=f'バックアップして{count}項目をゲームに保存（必要時に管理者確認）',command=save);button.pack(pady=12)
  def preview_equipment_save(self):
   if not self.character:return
   try:plan=self.editor.prepare_equipment_save(self.character.folder_id)
@@ -281,7 +261,7 @@ class ReaderWindow:
    except (OSError,ValueError,RuntimeError) as e:
     self.update_edit_status();dialogs.showerror('ゲームへの保存',str(e),parent=window);button.configure(state='normal');return
    window.destroy();self.refresh_edits();self.footer.configure(text=f'{count}枠を保存・検証しました。バックアップ: {backup}')
-  button=ttk.Button(window,text=f'バックアップして{count}枠をゲームに保存',command=save);button.pack(pady=12)
+  button=ActionButton(window,busy=True,text=f'バックアップして{count}枠をゲームに保存（必要時に管理者確認）',command=save);button.pack(pady=12)
  def change_character(self,event=None):self.change_mode()
  @traced('ui.change_mode')
  def change_mode(self):
@@ -489,7 +469,7 @@ class ReaderWindow:
    try:edit=self.editor.prepare_macro_edit(c.folder_id,macro_key(macro),entries[0].get(),[c.value for c in controllers])
    except ValueError as e:dialogs.showerror('入力内容',str(e),parent=window);return
    self.preview_edit(edit,lambda:self.editor.apply(edit),window)
-  ttk.Button(window,text='変更案を確認',command=preview).pack(pady=12)
+  ActionButton(window,busy=True,text='変更案を確認',command=preview).pack(pady=12)
  def preview_edit(self,edit,apply,parent=None):
   window=tk.Toplevel(self.app,background='#080f22');window.title(edit.label+' / 作業データ');window.geometry('900x600')
   text=tk.Text(window,bg='#101b38',fg='#edf1fa',wrap='word',padx=12,pady=12)
@@ -513,7 +493,7 @@ class ReaderWindow:
    except (ValueError,OSError) as e:dialogs.showerror('作業保存',str(e),parent=window);return
    window.destroy()
    if parent and parent.winfo_exists():parent.destroy()
-  ttk.Button(window,text=f'{count}マクロの変更を作業データに適用',command=commit,state='normal' if count and not self.editor.blocked else 'disabled').pack(pady=12)
+  ActionButton(window,busy=True,text=f'{count}マクロの変更を作業データに適用',command=commit,state='normal' if count and not self.editor.blocked else 'disabled').pack(pady=12)
  def show_macro_inventory(self):
   c=self.character
   if not c:return
@@ -544,8 +524,8 @@ class ReaderWindow:
    edit=plan_macro_fixes(c,self.snapshot.items,address)
    self.preview_edit(edit,lambda:self.editor.macro_fixes(c.folder_id,edit,address),window)
   buttons=ttk.Frame(window);buttons.pack(fill='x',padx=10,pady=10)
-  selected_fix=ttk.Button(buttons,text='選択マクロのFix案',command=lambda:preview(True),state='disabled');selected_fix.pack(side='left')
-  ttk.Button(buttons,text='このキャラのFix案をまとめて確認',command=preview,state='normal' if any(r.replacement is not None for r in all_refs) else 'disabled').pack(side='left',padx=10)
+  selected_fix=ActionButton(buttons,busy=True,text='選択マクロのFix案',command=lambda:preview(True),state='disabled');selected_fix.pack(side='left')
+  ActionButton(buttons,busy=True,text='このキャラのFix案をまとめて確認',command=preview,state='normal' if any(r.replacement is not None for r in all_refs) else 'disabled').pack(side='left',padx=10)
   def open_macro():
    if not listing.curselection():return
    address=refs[listing.curselection()[0]].address

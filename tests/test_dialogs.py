@@ -9,13 +9,16 @@ from ff11reader import dialogs
 @unittest.skipUnless(os.environ.get('FF11_RUN_INTEGRATION')=='1','Enable synthetic Tk checks')
 class DialogTests(unittest.TestCase):
     def setUp(self):
-        self.app=tk.Tk();self.app.geometry('800x500');self.errors=[]
+        self.app=tk.Tk()
+        self.app.geometry('800x500');self.errors=[]
         self.app.report_callback_exception=lambda *args:self.errors.append(args)
         self.behind=tk.Entry(self.app);self.behind.pack();self.app.update();self.behind.focus_force()
-        self.app.after(4000,self.app.destroy)
+        self.timeout=self.app.after(4000,self.app.destroy)
 
     def tearDown(self):
-        try:self.app.destroy()
+        try:
+            self.app.after_cancel(self.timeout)
+            self.app.destroy()
         except tk.TclError:pass
         self.assertFalse(self.errors,self.errors)
 

@@ -145,8 +145,9 @@ class EquipmentSavingTests(unittest.TestCase):
         def fail(path,*args,**kwargs):
             if path.name.startswith('.ff11-equipment-'):raise PermissionError('denied')
             return original(path,*args,**kwargs)
-        with patch.object(Path,'open',fail):
-            with self.assertRaises(PermissionError):self.editor.save_equipment(self.plan,self.base/'backups')
+        with patch.object(Path,'open',fail), patch('ff11reader.elevation.launch_elevated',side_effect=RuntimeError('管理者確認を取り消しました')) as launch:
+            with self.assertRaisesRegex(RuntimeError,'取り消し'):self.editor.save_equipment(self.plan,self.base/'backups')
+            launch.assert_called_once()
         for f in self.plan.files:self.assertEqual(Path(f.target).read_bytes(),f.original)
         self.assertFalse(self.editor.store.path.with_suffix('.pending.json').exists())
 

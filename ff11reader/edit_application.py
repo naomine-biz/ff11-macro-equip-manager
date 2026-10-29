@@ -165,7 +165,8 @@ class Editor:
         from .saving import atomic_replace
         atomic_replace(pending,json.dumps(data,ensure_ascii=False).encode('utf-8'))
         try:
-            backup=execute_save(preview,backup_root)
+            from .elevation import execute_with_permission
+            backup=execute_with_permission(preview,backup_root,execute_save)
         except Exception as exc:
             try:unchanged=all(Path(f.target).read_bytes()==f.original for f in preview.files)
             except OSError:unchanged=False
